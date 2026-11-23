@@ -77,7 +77,7 @@ test('a harder task never gets a weaker model', () => {
 test('documented starting points', () => {
   assert.deepEqual(pick(decide(label({ category: 'chat_simple' }))), ['sonnet', 'low']);
   assert.deepEqual(pick(decide(label({ category: 'coding_routine' }))), ['sonnet', 'medium']);
-  assert.deepEqual(pick(decide(label({ category: 'coding_hard' }))), ['fable', 'medium']);
+  assert.deepEqual(pick(decide(label({ category: 'coding_hard' }))), ['opus', 'medium']);
   assert.deepEqual(pick(decide(label({ category: 'deep_reasoning' }))), ['fable', 'high']);
 });
 
@@ -295,10 +295,11 @@ test('names every object inherits are not mistaken for models or categories', ()
   assert.throws(() => readDecision(decision({ category: 'constructor' })), /unknown category/);
 });
 
-test('policy: Opus coordinates, Sonnet does small jobs, Fable does deep work', () => {
+test('policy: Sonnet small jobs, Opus coordination and hard builds, Fable only the deepest thinking', () => {
   const coordinating = ['orchestration', 'review_verify'];
   const small = ['classify_extract', 'chat_simple', 'search_read', 'coding_routine'];
-  const deep = ['coding_hard', 'knowledge_research', 'long_autonomous'];
+  const deep = ['knowledge_research'];
+  const builds = ['coding_hard', 'long_autonomous'];
   for (const category of Object.keys(ROUTES)) {
     for (const difficulty of DIFFICULTIES) {
       const { model, effort } = decide(label({ category, difficulty }));
@@ -308,7 +309,8 @@ test('policy: Opus coordinates, Sonnet does small jobs, Fable does deep work', (
       else if (category === 'deep_reasoning') assert.equal(model, 'fable', where);
       else if (small.includes(category)) assert.equal(model, 'sonnet', where);
       else if (deep.includes(category) && difficulty === 'hard') assert.deepEqual([model, effort], ['fable', 'high'], where);
-      else assert.notEqual(model, 'opus', where);
+      else if (builds.includes(category)) assert.notEqual(model, 'fable', where);
+      else assert.equal(model, 'sonnet', where);
     }
   }
 });

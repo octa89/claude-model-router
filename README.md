@@ -17,7 +17,7 @@ Fixed rules then turn those answers into a model and an effort level. The rules 
 
 ## Policy
 
-**Opus 5.5 coordinates (main session, planning, reviews); Sonnet 5.5 does the small and everyday jobs; Fable 5.2 does the deep work.** Effort levels follow each model's guide: Sonnet low for chat and search and medium for coding; Opus medium (its default, which beats Opus 5 at high); Fable high for hard work.
+**Opus 5.5 coordinates (main session, planning, reviews) and takes hard builds; Sonnet 5.5 does the small and everyday jobs; Fable 5.2 only does the deepest thinking (design, hard research).** Hard builds moved from Fable to Opus on 2026-11-23: Fable builds cost $375 in one day, and Opus is half the price and its guide names multistep work in a real repository as its biggest gain. Effort levels follow each model's guide: Sonnet low for chat and search and medium for coding; Opus medium (its default, which beats Opus 5 at high); Fable high for hard work.
 
 | Task | Easy | Normal | Hard |
 |---|---|---|---|
@@ -25,9 +25,9 @@ Fixed rules then turn those answers into a model and an effort level. The rules 
 | Simple chat | Sonnet low | Sonnet low | Sonnet medium |
 | Search and read | Sonnet low | Sonnet low | Sonnet medium |
 | Routine coding | Sonnet medium | Sonnet medium | Sonnet high |
-| Hard coding | Sonnet high | Fable medium | Fable high |
+| Hard coding | Sonnet high | Opus medium | Opus high |
 | Research and analysis | Sonnet medium | Sonnet high | Fable high |
-| Long unattended work | Sonnet medium | Sonnet high | Fable high |
+| Long unattended work | Sonnet medium | Sonnet high | Opus high |
 | Deep reasoning, design | Fable medium | Fable high | Fable high |
 | Orchestrating other agents | Opus medium | Opus medium | Opus high |
 | Review and verification | Opus medium | Opus high | Opus high |

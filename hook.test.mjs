@@ -159,10 +159,10 @@ test('read-only and relay subagent types use a fixed route without the classifie
 });
 
 test('a Fable brief below high effort gets the finish-the-task note, once', async () => {
-  const out = await handle(event({ prompt: 'Fix the flaky sync bug', subagent_type: 'general-purpose' }), opts(fakeFetch(reply('coding_hard', 'normal'))));
+  const out = await handle(event({ prompt: 'Fix the flaky sync bug', subagent_type: 'general-purpose' }), opts(fakeFetch(reply('deep_reasoning', 'easy'))));
   const input = out.hookSpecificOutput.updatedInput;
   assert.deepEqual([input.model, input.effort], ['fable', 'medium']);
   assert.ok(input.prompt.startsWith('Fix the flaky sync bug\n\n# Finishing work\n'));
-  const high = await handle(event({ prompt: 'Fix it', subagent_type: 'general-purpose' }), opts(fakeFetch(reply('coding_hard', 'hard'))));
+  const high = await handle(event({ prompt: 'Fix it', subagent_type: 'general-purpose' }), opts(fakeFetch(reply('deep_reasoning', 'hard'))));
   assert.equal(high.hookSpecificOutput.updatedInput.prompt, 'Fix it');
 });

@@ -69,11 +69,13 @@ export const DIFFICULTIES = Object.keys(DIFFICULTY_CRITERIA);
 //   - Sonnet 5.5 takes the small and everyday jobs: low for chat, extraction
 //     and search (its guide's starting point), medium for agentic coding (at
 //     low it can skip verifying a change), high for normal long builds.
-//   - Fable 5.2 is the deep worker: hard coding, hard research, design and
-//     hard long unattended runs, at high (its guide: high for hard coding,
-//     research and long unattended runs). Normal deep reasoning runs at
-//     medium, with a "finish the whole task" note added to the brief, since
-//     it stops early more often below high.
+//   - Opus 5.5 also takes hard coding and hard long builds: its guide names
+//     multistep work in a real repository as its biggest gain, at half
+//     Fable's price. Measured 2026-11-23: builds on Fable high cost $375 in
+//     one day, $135 of it output (thinking) alone.
+//   - Fable 5.2 is kept for the deepest thinking: design and architecture,
+//     and hard research, at high. Normal deep reasoning runs at medium, with
+//     a "finish the whole task" note added, since it stops early below high.
 //   - xhigh and max are never chosen here: the guides reserve them for a
 //     measured gain.
 export const ROUTES = {
@@ -81,9 +83,9 @@ export const ROUTES = {
   chat_simple: ['sonnet:low', 'sonnet:low', 'sonnet:medium'],
   search_read: ['sonnet:low', 'sonnet:low', 'sonnet:medium'],
   coding_routine: ['sonnet:medium', 'sonnet:medium', 'sonnet:high'],
-  coding_hard: ['sonnet:high', 'fable:medium', 'fable:high'],
+  coding_hard: ['sonnet:high', 'opus:medium', 'opus:high'],
   knowledge_research: ['sonnet:medium', 'sonnet:high', 'fable:high'],
-  long_autonomous: ['sonnet:medium', 'sonnet:high', 'fable:high'],
+  long_autonomous: ['sonnet:medium', 'sonnet:high', 'opus:high'],
   deep_reasoning: ['fable:medium', 'fable:high', 'fable:high'],
   orchestration: ['opus:medium', 'opus:medium', 'opus:high'],
   review_verify: ['opus:medium', 'opus:high', 'opus:high'],
