@@ -18,6 +18,7 @@ import {
   buildDecisionRequest,
   readDecision,
   route,
+  classify,
 } from './router.mjs';
 
 const label = (over = {}) => ({
@@ -305,4 +306,57 @@ test('policy: Fable plans, reviews and runs long work; the rest stays at Opus or
       else assert.notEqual(model, 'fable', `${category}/${difficulty}`);
     }
   }
+});
+
+// --- retry on rate limits and server errors ---
+
+const sequenceFetch = (...replies) => {
+  const f = async () => {
+    f.calls += 1;
+    const next = replies.shift();
+    if (next instanceof Error) throw next;
+    const [status, body, headers = {}] = next;
+    return {
+      ok: status >= 200 && status < 300,
+      status,
+      text: async () => JSON.stringify(body),
+      headers: { get: (name) => headers[name.toLowerCase()] ?? null },
+    };
+  };
+  f.calls = 0;
+  return f;
+};
+const noWait = { sleep: async () => {} };
+
+test('a rate limit or server error is retried once, then the answer is used', async () => {
+  for (const first of [[429, { error: 'slow down' }], [503, { error: 'busy' }], new Error('socket hang up')]) {
+    const f = sequenceFetch(first, [200, decision({ category: 'chat_simple' })]);
+    const r = await classify('hi', { apiKey: 'k', fetchImpl: f, ...noWait });
+    assert.equal(r.category, 'chat_simple');
+    assert.equal(f.calls, 2);
+  }
+});
+
+test('a second failure is final, and other errors are not retried', async () => {
+  const twice = sequenceFetch([429, {}], [429, {}]);
+  await assert.rejects(classify('hi', { apiKey: 'k', fetchImpl: twice, ...noWait }), /429/);
+  assert.equal(twice.calls, 2);
+
+  const bad = sequenceFetch([400, { error: 'bad request' }]);
+  await assert.rejects(classify('hi', { apiKey: 'k', fetchImpl: bad, ...noWait }), /400/);
+  assert.equal(bad.calls, 1);
+});
+
+test('a short Retry-After is honoured, a long one is not', async () => {
+  const waits = [];
+  const sleep = async (ms) => waits.push(ms);
+  await classify('hi', { apiKey: 'k', fetchImpl: sequenceFetch([429, {}, { 'retry-after': '2' }], [200, decision()]), sleep });
+  await classify('hi', { apiKey: 'k', fetchImpl: sequenceFetch([429, {}, { 'retry-after': '60' }], [200, decision()]), sleep, retryDelayMs: 800 });
+  assert.deepEqual(waits, [2000, 800]);
+});
+
+test('route falls back after the retry also fails', async () => {
+  const r = await route('anything', { apiKey: 'k', fetchImpl: sequenceFetch([429, {}], [429, {}]), retryDelayMs: 1 });
+  assert.equal(r.source, 'fallback');
+  assert.match(r.classifierError, /429/);
 });

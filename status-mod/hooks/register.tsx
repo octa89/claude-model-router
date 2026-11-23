@@ -74,8 +74,12 @@ export const briefKey = (text: string): string => {
   return (hash >>> 0).toString(16).padStart(8, '0')
 }
 
-/** Reads the end of the router's log: the latest choice, and a label per brief. */
-export const parse = (tail: string): { latest: string; byKey: Labels } => {
+/**
+ * Reads the end of the router's log: a label per brief, and the latest choice
+ * made for this session. The log is shared by every session, so the status
+ * line only counts lines carrying this session's id.
+ */
+export const parse = (tail: string, sessionId: string): { latest: string; byKey: Labels } => {
   const byKey: Labels = {}
   let latest = NOTHING_YET
 
@@ -93,7 +97,11 @@ export const parse = (tail: string): { latest: string; byKey: Labels } => {
 
       const model = decision.model.charAt(0).toUpperCase() + decision.model.slice(1)
       // Kept short on purpose: the status line is cut after about 35 characters.
-      latest = `${model} · ${decision.effort} effort`
+      const choice = `${model} · ${decision.effort} effort`
+
+      if (decision.session === sessionId) {
+        latest = choice
+      }
 
       const sure =
         typeof decision.confidence === 'number'
@@ -110,7 +118,7 @@ export const parse = (tail: string): { latest: string; byKey: Labels } => {
           : 'safe default, Bison gave no clear answer'
 
       if (typeof decision.key === 'string') {
-        byKey[decision.key] = `${latest} · ${why}`
+        byKey[decision.key] = `${choice} · ${why}`
       }
     } catch {
       // A half-written or cut line: skip it.
@@ -243,7 +251,8 @@ export const register: Register = on => {
     try {
       const { size } = await $.fs.stat(logPath($))
       const offset = Math.max(0, size - TAIL_BYTES)
-      const { latest, byKey } = parse(await $.fs.read(logPath($), { offset, length: TAIL_BYTES }))
+      const tail = await $.fs.read(logPath($), { offset, length: TAIL_BYTES })
+      const { latest, byKey } = parse(tail, await $.session.id())
       lastSubagent = latest
       await update($, labels, () => byKey)
     } catch {
@@ -262,7 +271,8 @@ export const register: Register = on => {
     try {
       const { size } = await $.fs.stat(logPath($))
       const offset = Math.max(0, size - TAIL_BYTES)
-      const { latest, byKey } = parse(await $.fs.read(logPath($), { offset, length: TAIL_BYTES }))
+      const tail = await $.fs.read(logPath($), { offset, length: TAIL_BYTES })
+      const { latest, byKey } = parse(tail, await $.session.id())
       lastSubagent = latest
       await update($, labels, () => byKey)
       $.ui.status(statusLine(isPlanning, lastSubagent))

@@ -289,17 +289,49 @@ function clip(task) {
 
 /** Ask the decision model, through OpenRouter, to label the task. */
 export async function classify(task, opts = {}) {
-  const { apiKey, classifierModel = DEFAULT_CLASSIFIER, parts = [], fetchImpl = fetch, timeoutMs = 20000 } = opts;
+  const {
+    apiKey,
+    classifierModel = DEFAULT_CLASSIFIER,
+    parts = [],
+    fetchImpl = fetch,
+    timeoutMs = 20000,
+    // One retry after a rate limit (429), a server error (5xx) or a failed
+    // connection; any other error is final.
+    retries = 1,
+    retryDelayMs = 800,
+    sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+  } = opts;
   if (!apiKey) throw new Error('OPENROUTER_API_KEY is not set');
-  const res = await fetchImpl(DECISIONS_URL, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify(buildDecisionRequest(task, classifierModel, parts)),
-    signal: AbortSignal.timeout(timeoutMs),
-  });
-  const body = await res.text();
-  if (!res.ok) throw new Error(`OpenRouter returned ${res.status}: ${body.slice(0, 300)}`);
-  return readDecision(JSON.parse(body));
+
+  for (let attempt = 0; ; attempt += 1) {
+    let res;
+    let body;
+    try {
+      res = await fetchImpl(DECISIONS_URL, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(buildDecisionRequest(task, classifierModel, parts)),
+        signal: AbortSignal.timeout(timeoutMs),
+      });
+      body = await res.text();
+    } catch (err) {
+      if (attempt < retries) {
+        await sleep(retryDelayMs);
+        continue;
+      }
+      throw err;
+    }
+    if (res.ok) return readDecision(JSON.parse(body));
+
+    const isRetryable = res.status === 429 || res.status >= 500;
+    if (isRetryable && attempt < retries) {
+      // Honour a short Retry-After (up to 2 seconds); otherwise wait the default.
+      const after = Number(res.headers?.get?.('retry-after'));
+      await sleep(after > 0 && after <= 2 ? after * 1000 : retryDelayMs);
+      continue;
+    }
+    throw new Error(`OpenRouter returned ${res.status}: ${body.slice(0, 300)}`);
+  }
 }
 
 /**
@@ -318,6 +350,7 @@ export async function route(task, opts = {}) {
     audio = [],
     fetchImpl,
     timeoutMs,
+    retryDelayMs,
   } = opts;
   const { text, truncated } = clip(task);
   // A bad file path or type is the caller's mistake, so this is allowed to throw.
@@ -331,7 +364,7 @@ export async function route(task, opts = {}) {
         'Bison 1 does not accept audio. Set ROUTER_AUDIO_CLASSIFIER_MODEL to a decision model that does, for example cloudflare/clef-omni'
       );
     }
-    classification = await classify(text, { apiKey, classifierModel: model, parts, fetchImpl, timeoutMs });
+    classification = await classify(text, { apiKey, classifierModel: model, parts, fetchImpl, timeoutMs, retryDelayMs });
   } catch (err) {
     classifierError = err.message;
   }

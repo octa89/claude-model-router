@@ -21,7 +21,9 @@ import { FABLE_SUBAGENT_TYPES, route } from './router.mjs';
 
 const LOG = join(dirname(fileURLToPath(import.meta.url)), 'router.log');
 const SUBAGENT_TOOLS = ['Agent', 'Task'];
-const CLASSIFY_TIMEOUT_MS = 6000;
+// Per attempt. With one retry the worst case (5 + 0.8 + 5 seconds) stays well
+// inside the hook's 15-second limit in settings.
+const CLASSIFY_TIMEOUT_MS = 5000;
 
 // The app may have started before the key was saved, so its environment can lack
 // it. On Windows, read the saved user variable directly. The value is never printed.
