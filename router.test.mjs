@@ -294,12 +294,14 @@ test('names every object inherits are not mistaken for models or categories', ()
   assert.throws(() => readDecision(decision({ category: 'constructor' })), /unknown category/);
 });
 
-test('policy: Fable plans and reviews, execution stays at Opus or lower', () => {
+test('policy: Fable plans, reviews and runs long work; the rest stays at Opus or lower', () => {
   const planning = ['orchestration', 'deep_reasoning', 'review_verify'];
   for (const category of Object.keys(ROUTES)) {
     for (const difficulty of DIFFICULTIES) {
-      const { model } = decide(label({ category, difficulty }));
+      const { model, effort } = decide(label({ category, difficulty }));
+      const isLongWork = category === 'long_autonomous' && difficulty !== 'easy';
       if (planning.includes(category)) assert.equal(model, 'fable', `${category}/${difficulty}`);
+      else if (isLongWork) assert.deepEqual([model, effort], ['fable', 'high'], `${category}/${difficulty}`);
       else assert.notEqual(model, 'fable', `${category}/${difficulty}`);
     }
   }

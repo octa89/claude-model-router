@@ -12,7 +12,7 @@ Fixed rules then turn those answers into a model and an effort level. The rules 
 
 ## Policy
 
-**Fable 5.2 plans and reviews; the work itself goes to Opus 5.5 or lower.**
+**Fable 5.2 plans, reviews and runs long unattended work; the rest of the work goes to Opus 5.5 or lower.**
 
 | Task | Easy | Normal | Hard |
 |---|---|---|---|
@@ -22,7 +22,7 @@ Fixed rules then turn those answers into a model and an effort level. The rules 
 | Routine coding | Sonnet medium | Sonnet medium | Sonnet high |
 | Hard coding | Sonnet high | Opus medium | Opus high |
 | Research and analysis | Sonnet medium | Opus medium | Opus high |
-| Long unattended work | Opus medium | Opus high | Opus high |
+| Long unattended work | Opus medium | Fable high | Fable high |
 | Deep reasoning, design (planning) | Fable medium | Fable high | Fable high |
 | Orchestrating other agents (planning) | Fable medium | Fable medium | Fable high |
 | Review and verification | Fable medium | Fable high | Fable high |

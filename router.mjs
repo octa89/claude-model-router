@@ -61,11 +61,15 @@ export const DIFFICULTIES = Object.keys(DIFFICULTY_CRITERIA);
 
 // category -> [easy, normal, hard] as "model:effort".
 //
-// Policy: Fable 5.2 plans and reviews; doing the work goes to Opus 5.5 or lower.
+// Policy: Fable 5.2 plans, reviews and runs long unattended work; the rest of
+// the work goes to Opus 5.5 or lower.
 //   - Planning and design (orchestration, deep_reasoning) and every review run
 //     on Fable, at medium for easy work (the Fable guide: plan at medium) and
 //     high otherwise.
-//   - Execution is capped at Opus: Sonnet 5.5 starts at low for chat,
+//   - Long unattended work of normal or hard difficulty runs on Fable at high
+//     (the Fable guide: high for "long unattended runs"; it stops early more
+//     often at low and medium). Easy long work stays on Opus.
+//   - Other execution is capped at Opus: Sonnet 5.5 starts at low for chat,
 //     extraction and search and at medium for agentic coding; Opus 5.5 takes
 //     the harder work.
 //   - xhigh and max are never chosen here: the docs reserve them for a
@@ -77,7 +81,7 @@ export const ROUTES = {
   coding_routine: ['sonnet:medium', 'sonnet:medium', 'sonnet:high'],
   coding_hard: ['sonnet:high', 'opus:medium', 'opus:high'],
   knowledge_research: ['sonnet:medium', 'opus:medium', 'opus:high'],
-  long_autonomous: ['opus:medium', 'opus:high', 'opus:high'],
+  long_autonomous: ['opus:medium', 'fable:high', 'fable:high'],
   deep_reasoning: ['fable:medium', 'fable:high', 'fable:high'],
   orchestration: ['fable:medium', 'fable:medium', 'fable:high'],
   review_verify: ['fable:medium', 'fable:high', 'fable:high'],
