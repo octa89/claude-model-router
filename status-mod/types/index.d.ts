@@ -5,8 +5,11 @@ export type Labels = Record<string, string>
 export type Rating = 'right' | 'stronger' | 'cheaper'
 export type Ratings = Record<string, Rating>
 
+/** The key of the brief each subagent was first started with, by agent id. */
+export type AgentKeys = Record<string, string>
+
 declare module 'claude-code' {
   interface PluginState {
-    'router-status': { labels: Labels; ratings: Ratings }
+    'router-status': { labels: Labels; ratings: Ratings; agentKeys: AgentKeys }
   }
 }

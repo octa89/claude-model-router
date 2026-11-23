@@ -1,6 +1,6 @@
 {
   "name": "router-status",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "Shows the model router's choices, records each subagent's outcome and your rating for tuning, and runs the main session on Fable 5.2 while plan mode is on.",
   "author": { "name": "octa89" },
   "license": "MIT",

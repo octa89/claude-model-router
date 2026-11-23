@@ -1,7 +1,7 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 
-import type { Labels, Rating, Ratings } from '../types'
+import type { AgentKeys, Labels, Rating, Ratings } from '../types'
 
 // The router's hook writes router.log next to hook.mjs, one folder above this
 // mod. So the mod must be installed from that folder (a directory
@@ -54,6 +54,10 @@ const RISK_THRESHOLD = 0.4
 const labels = atom({ plugin: 'router-status', key: 'labels' } as const, {})
 // Ratings given in this session, so a rated row shows its rating.
 const ratings = atom({ plugin: 'router-status', key: 'ratings' } as const, {} as Ratings)
+// A subagent's first brief, so its follow-up turns (each message sent to it
+// starts it again) are joined to the router's original decision. Kept in the
+// session's state so a reload of the add-on keeps it.
+const agentKeys = atom({ plugin: 'router-status', key: 'agentKeys' } as const, {} as AgentKeys)
 
 /**
  * The key the router logs for a brief: 32-bit FNV-1a of its text, in hex.
@@ -158,10 +162,20 @@ export const register: Register = on => {
   // to the router's decision.
   on('agent.spawn', async ($, e, next) => {
     const started = await next(e)
+    const agentId = started.agentId
 
-    if (started.agentId !== undefined) {
-      runs.set(started.agentId, {
-        key: briefKey(e.prompt),
+    if (agentId !== undefined) {
+      // A message sent to a running subagent starts it again with that
+      // message as its prompt: keep the key of its first brief.
+      const known = (await read($, agentKeys))[agentId]
+      const key = known ?? briefKey(e.prompt)
+
+      if (known === undefined) {
+        await update($, agentKeys, k => ({ ...k, [agentId]: key }))
+      }
+
+      runs.set(agentId, {
+        key,
         subagentType: e.subagentType,
         model: started.model,
         steps: 0,
