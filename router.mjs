@@ -335,13 +335,25 @@ export async function classify(task, opts = {}) {
 }
 
 /**
+ * The classifier asked when the main one fails (rate limit, server error,
+ * timeout, bad answer). Jev 1.14 runs on a different host from Bison, matched
+ * Bison on category (89%) and risk (100% caught) in the level 1 test, and is
+ * weaker on difficulty. ROUTER_BACKUP_CLASSIFIER=off turns the backup off.
+ */
+export const DEFAULT_BACKUP_CLASSIFIER = 'typesafe/jev-1.14';
+
+/**
  * Full path: classify, then decide. Never throws for a classifier problem:
- * it falls back to the safe default and says why in `classifierError`.
+ * the main classifier is asked once; if it fails, the backup is asked once;
+ * if that fails too, the safe default is used and `classifierError` says why.
  */
 export async function route(task, opts = {}) {
   const {
     apiKey = process.env.OPENROUTER_API_KEY,
+    // A separate OpenRouter key for the backup, to keep its spend apart.
+    backupApiKey = process.env.ROUTER_BACKUP_API_KEY || apiKey,
     classifierModel = process.env.ROUTER_CLASSIFIER_MODEL || DEFAULT_CLASSIFIER,
+    backupClassifierModel = process.env.ROUTER_BACKUP_CLASSIFIER || DEFAULT_BACKUP_CLASSIFIER,
     audioClassifierModel = process.env.ROUTER_AUDIO_CLASSIFIER_MODEL || null,
     allowHaiku = process.env.ROUTER_ALLOW_HAIKU === '1',
     minModel = null,
@@ -356,22 +368,58 @@ export async function route(task, opts = {}) {
   // A bad file path or type is the caller's mistake, so this is allowed to throw.
   const parts = await loadMedia({ images, audio });
   const model = audio.length ? audioClassifierModel : classifierModel;
+  // No backup for audio (Jev reads text and images only), or when turned off.
+  const backup =
+    !audio.length && backupClassifierModel && backupClassifierModel !== 'off' && backupClassifierModel !== model
+      ? backupClassifierModel
+      : null;
   let classification = null;
   let classifierError = null;
+  let answeredBy = model ?? classifierModel;
+  let primaryError = null;
   try {
     if (!model) {
       throw new Error(
         'Bison 1 does not accept audio. Set ROUTER_AUDIO_CLASSIFIER_MODEL to a decision model that does, for example cloudflare/clef-omni'
       );
     }
-    classification = await classify(text, { apiKey, classifierModel: model, parts, fetchImpl, timeoutMs, retryDelayMs });
+    // With a backup, skip the retry: asking another host is faster than waiting.
+    classification = await classify(text, {
+      apiKey,
+      classifierModel: model,
+      parts,
+      fetchImpl,
+      timeoutMs,
+      retryDelayMs,
+      retries: backup ? 0 : 1,
+    });
   } catch (err) {
     classifierError = err.message;
   }
+
+  if (!classification && backup && apiKey && model) {
+    primaryError = classifierError;
+    try {
+      classification = await classify(text, {
+        apiKey: backupApiKey,
+        classifierModel: backup,
+        parts,
+        fetchImpl,
+        timeoutMs,
+        retries: 0,
+      });
+      answeredBy = backup;
+      classifierError = null;
+    } catch (err) {
+      classifierError = `${primaryError}; backup ${backup}: ${err.message}`;
+    }
+  }
+
   const result = decide(classification, { allowHaiku, minModel, risk });
   return {
     ...result,
-    classifierModel: model ?? classifierModel,
+    classifierModel: answeredBy,
+    ...(primaryError && classification ? { backupUsed: true, primaryError } : {}),
     ...(parts.length ? { media: { images: images.length, audio: audio.length } } : {}),
     ...(classifierError ? { classifierError } : {}),
     ...(truncated ? { truncated: true } : {}),

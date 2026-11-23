@@ -133,6 +133,8 @@ Settings, all optional, as environment variables:
 |---|---|
 | `ROUTER_DISABLE=1` | Turns the router off, for example in one project's `.claude/settings.json` `env` block. |
 | `ROUTER_CLASSIFIER_MODEL` | Another decision model in place of Bison 1. It must be served by `/api/alpha/decisions`. |
+| `ROUTER_BACKUP_CLASSIFIER` | The classifier asked when the main one fails (rate limit, server error, timeout). Default `typesafe/jev-1.14`, which runs on a different host; `off` turns the backup off. |
+| `ROUTER_BACKUP_API_KEY` | Optional second OpenRouter key for the backup, to keep its spend apart. Without it the backup uses `OPENROUTER_API_KEY`. |
 | `ROUTER_ALLOW_HAIKU=1` | Lets Haiku 5.5 take simple labelling and extraction work. |
 | `ROUTER_AUDIO_CLASSIFIER_MODEL` | A decision model that accepts audio (Bison 1 reads text and images only), such as `cloudflare/clef-omni`. |
 

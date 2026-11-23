@@ -35,7 +35,8 @@ for (const d of rows) {
   const when = new Date(d.time).toLocaleString();
   const why =
     d.source === 'classifier'
-      ? `${d.category}, ${d.difficulty}, ${Math.round((d.confidence ?? 0) * 100)}%`
+      ? `${d.category}, ${d.difficulty}, ${Math.round((d.confidence ?? 0) * 100)}%` +
+        (d.classifier && !/bison/i.test(d.classifier) ? ` (by ${d.classifier.split('/').pop()})` : '')
       : `safe default${d.error ? ` (${d.error.slice(0, 40)})` : ''}`;
   console.log(
     pad(when, 20),

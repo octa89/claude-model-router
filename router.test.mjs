@@ -360,3 +360,61 @@ test('route falls back after the retry also fails', async () => {
   assert.equal(r.source, 'fallback');
   assert.match(r.classifierError, /429/);
 });
+
+// --- backup classifier ---
+
+const modelOf = (init) => JSON.parse(init.body).model;
+const recordingFetch = (replyFor) => {
+  const f = async (url, init) => {
+    f.models.push(modelOf(init));
+    const [status, body] = replyFor(modelOf(init), f.models.length);
+    return { ok: status === 200, status, text: async () => JSON.stringify(body), headers: { get: () => null } };
+  };
+  f.models = [];
+  return f;
+};
+
+test('when Bison fails, Jev is asked at once and its answer is used', async () => {
+  const f = recordingFetch((model) => (model === 'baseten/bison-1' ? [429, { error: 'rate limit' }] : [200, decision({ category: 'chat_simple' })]));
+  const r = await route('hi', { apiKey: 'k', classifierModel: 'baseten/bison-1', backupClassifierModel: 'typesafe/jev-1.14', fetchImpl: f });
+  assert.deepEqual(f.models, ['baseten/bison-1', 'typesafe/jev-1.14'], 'no retry of Bison first');
+  assert.equal(r.source, 'classifier');
+  assert.equal(r.classifierModel, 'typesafe/jev-1.14');
+  assert.equal(r.backupUsed, true);
+  assert.match(r.primaryError, /429/);
+  assert.equal(r.classifierError, undefined);
+});
+
+test('when both fail, the safe default names both errors', async () => {
+  const f = recordingFetch(() => [503, { error: 'busy' }]);
+  const r = await route('hi', { apiKey: 'k', classifierModel: 'baseten/bison-1', backupClassifierModel: 'typesafe/jev-1.14', fetchImpl: f });
+  assert.equal(r.source, 'fallback');
+  assert.match(r.classifierError, /503.*backup typesafe\/jev-1\.14.*503/);
+  assert.equal(f.models.length, 2);
+});
+
+test('a backup key is used for the backup call only', async () => {
+  const keys = [];
+  const f = async (url, init) => {
+    keys.push(init.headers.Authorization);
+    const isBison = modelOf(init) === 'baseten/bison-1';
+    return { ok: !isBison, status: isBison ? 429 : 200, text: async () => JSON.stringify(decision()), headers: { get: () => null } };
+  };
+  await route('hi', { apiKey: 'main', backupApiKey: 'backup', classifierModel: 'baseten/bison-1', backupClassifierModel: 'typesafe/jev-1.14', fetchImpl: f });
+  assert.deepEqual(keys, ['Bearer main', 'Bearer backup']);
+});
+
+test('with the backup off, Bison is retried once as before', async () => {
+  const f = recordingFetch((model, n) => (n === 1 ? [429, {}] : [200, decision()]));
+  const r = await route('hi', { apiKey: 'k', classifierModel: 'baseten/bison-1', backupClassifierModel: 'off', fetchImpl: f, retryDelayMs: 1 });
+  assert.deepEqual(f.models, ['baseten/bison-1', 'baseten/bison-1']);
+  assert.equal(r.source, 'classifier');
+  assert.equal(r.backupUsed, undefined);
+});
+
+test('a low-confidence answer is not an error: no backup call', async () => {
+  const f = recordingFetch(() => [200, decision({ p: 0.2 })]);
+  const r = await route('hi', { apiKey: 'k', classifierModel: 'baseten/bison-1', backupClassifierModel: 'typesafe/jev-1.14', fetchImpl: f });
+  assert.equal(f.models.length, 1);
+  assert.equal(r.source, 'fallback');
+});

@@ -108,6 +108,9 @@ export async function handle(event, { logFile = LOG, ...routeOpts } = {}) {
     riskProbability: choice.riskProbability ?? null,
     // How long the decision took, classifier call included.
     ms: Date.now() - startedAt,
+    // Which classifier answered; the main one's error when the backup did.
+    classifier: choice.classifierModel,
+    ...(choice.backupUsed ? { primaryError: String(choice.primaryError).slice(0, 120) } : {}),
     ...(choice.classifierError ? { error: choice.classifierError } : {}),
   });
 
@@ -134,6 +137,8 @@ async function main() {
   for await (const chunk of process.stdin) raw += chunk;
   const event = JSON.parse(raw.replace(/^\uFEFF/, ''));
   process.env.OPENROUTER_API_KEY ||= savedUserVariable('OPENROUTER_API_KEY') ?? '';
+  // Optional: a separate OpenRouter key for the backup classifier.
+  process.env.ROUTER_BACKUP_API_KEY ||= savedUserVariable('ROUTER_BACKUP_API_KEY') ?? '';
   // ROUTER_LOG=off: decide without logging (the evaluations use this).
   const output = await handle(event, process.env.ROUTER_LOG === 'off' ? { logFile: null } : {});
   if (output) process.stdout.write(JSON.stringify(output));
