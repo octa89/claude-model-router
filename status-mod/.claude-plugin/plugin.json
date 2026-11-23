@@ -1,6 +1,6 @@
 {
   "name": "router-status",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "description": "The model router: gives each subagent its model and effort (Sonnet for small jobs, Fable for deep work, Opus for planning and review), shows each choice, and records outcomes and your ratings for tuning.",
   "author": { "name": "octa89" },
   "license": "MIT",

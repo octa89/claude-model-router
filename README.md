@@ -2,7 +2,10 @@
 
 Picks a Claude model and effort level for each subagent that Claude Code starts. The main session is the coordinator on Opus 5.5; small jobs go to Sonnet 5.5, deep work to Fable 5.2, and planning and reviews stay on Opus.
 
-The routing runs inside the `router-status` mod, at the moment a subagent starts (its `agent.spawn` hook sets the model and brief, its `turn.step` hook sets the effort of each of the subagent's requests). It does not use a PreToolUse hook: a hook that rewrites the Agent call makes auto mode send the call back once. Only subagents started with the Agent tool are routed; a separate session runs on your default model, so sessions are told to run builds as subagents.
+The routing runs inside the `router-status` mod, at the moment a subagent starts (its `agent.spawn` hook sets the model and brief, its `turn.step` hook sets the effort of each of the subagent's requests). It does not use a PreToolUse hook: a hook that rewrites the Agent call makes auto mode send the call back once. Sessions are routed too, in every Claude Code app (terminal, desktop, IDE), because the mod loads wherever your user plugins do:
+
+- **Coordinator sessions**, the ones you start yourself in a project's main folder, keep your default model (Opus 5.5).
+- **Worker sessions**, ones opened in a git worktree or given their task by another session (a desktop linked session, say), are routed once from their first task: the router picks their model and effort for the whole session, so the prompt cache holds. The status line shows `This session: Sonnet · high effort`.
 
 A small decision model, **Bison 1** (`baseten/bison-1`, through [OpenRouter's Decisions API](https://openrouter.ai/baseten/bison-1)), reads each subagent's brief and answers three typed questions in about a third of a second:
 

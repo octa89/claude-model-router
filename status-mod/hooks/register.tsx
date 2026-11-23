@@ -1,7 +1,7 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 
-import type { AgentKeys, Labels, Rating, Ratings } from '../types'
+import type { AgentKeys, Labels, MainRoute, Rating, Ratings } from '../types'
 
 // The router (hook.mjs) sits one folder above this mod and writes router.log
 // there. So the mod must be installed from that folder (a directory
@@ -82,6 +82,45 @@ const ratings = atom({ plugin: 'router-status', key: 'ratings' } as const, {} as
 // starts it again) are joined to the router's original decision. Kept in the
 // session's state so a reload of the add-on keeps it.
 const agentKeys = atom({ plugin: 'router-status', key: 'agentKeys' } as const, {} as AgentKeys)
+// The main session's role and, for a worker, its model and effort. Kept in
+// the session's state so a reload keeps the decision (and the prompt cache).
+const mainRoute = atom({ plugin: 'router-status', key: 'mainRoute' } as const, { role: 'undecided' } as MainRoute)
+
+// Where a task given by another session comes from.
+const PEER_ORIGINS = ['peer', 'peer-send-message', 'coordinator', 'projects-relay']
+
+/** Whether the session's folder is a linked git worktree (not the main checkout). */
+async function isLinkedWorktree($: EngineInterface): Promise<boolean> {
+  try {
+    const { exitCode, stdout } = await $.process.run(['git', 'rev-parse', '--path-format=absolute', '--git-dir', '--git-common-dir'], {
+      timeoutMs: 5000,
+    })
+    const [gitDir, commonDir] = stdout.trim().split(/\r?\n/).map(line => line.trim().replace(/\\/g, '/'))
+    return exitCode === 0 && gitDir !== undefined && commonDir !== undefined && gitDir !== commonDir
+  } catch {
+    return false
+  }
+}
+
+/** The router's choice for a brief, by running hook.mjs; null when it gives none. */
+async function askRouter(
+  $: EngineInterface,
+  input: { prompt: string; description: string; subagent_type: string; model?: string },
+  cwd: string | null,
+): Promise<{ model: string; effort: string; prompt?: string } | null> {
+  const event = {
+    hook_event_name: 'PreToolUse',
+    tool_name: 'Agent',
+    session_id: await $.session.id().catch(() => null),
+    cwd,
+    tool_input: input,
+  }
+  const { exitCode, stdout } = await $.process.run(['node', routerPath($)], {
+    stdin: JSON.stringify(event),
+    timeoutMs: 15000,
+  })
+  return exitCode === 0 ? readDecision(stdout) : null
+}
 
 /**
  * The key the router logs for a brief: 32-bit FNV-1a of its text, in hex.
@@ -230,23 +269,16 @@ export const register: Register = on => {
 
     if (!e.fork && e.resume === undefined && e.workflow === undefined) {
       try {
-        const event = {
-          hook_event_name: 'PreToolUse',
-          tool_name: 'Agent',
-          session_id: await $.session.id().catch(() => null),
-          cwd: e.cwd ?? (await $.session.cwd().catch(() => null)),
-          tool_input: {
+        const decision = await askRouter(
+          $,
+          {
             prompt: e.prompt,
             description: e.description,
             subagent_type: e.subagentType,
             ...(e.model !== undefined ? { model: e.model } : {}),
           },
-        }
-        const { exitCode, stdout } = await $.process.run(['node', routerPath($)], {
-          stdin: JSON.stringify(event),
-          timeoutMs: 15000,
-        })
-        const decision = exitCode === 0 ? readDecision(stdout) : null
+          e.cwd ?? (await $.session.cwd().catch(() => null)),
+        )
 
         if (decision !== null) {
           spawn = { ...e, model: decision.model, prompt: decision.prompt ?? e.prompt }
@@ -302,6 +334,50 @@ export const register: Register = on => {
 
   // Each model request: a routed subagent runs at the router's effort, and a
   // tracked subagent's tokens are added up.
+  // The main session. Sessions you start yourself are coordinators and keep
+  // their own model (Opus). A worker session (in a git worktree, or given
+  // its task by another session, as a desktop linked session is) is routed
+  // once, from its first task, for its whole life: one model keeps the
+  // prompt cache.
+  let firstOrigin: string | undefined
+
+  on('prompt.submit', ($, e, next) => {
+    if (firstOrigin === undefined && !e.isMeta) {
+      firstOrigin = e.origin.kind
+    }
+
+    return next(e)
+  })
+
+  on('turn.start', async ($, e, next) => {
+    if (e.agentId === undefined && e.text.trim() !== '' && (await read($, mainRoute)).role === 'undecided') {
+      try {
+        const isWorker =
+          (firstOrigin !== undefined && PEER_ORIGINS.includes(firstOrigin)) || (await isLinkedWorktree($))
+        let route: MainRoute = { role: 'coordinator' }
+
+        if (isWorker) {
+          const decision = await askRouter(
+            $,
+            { prompt: e.text, description: 'Main session task', subagent_type: 'main-session' },
+            await $.session.cwd().catch(() => null),
+          )
+
+          if (decision !== null) {
+            route = { role: 'worker', model: decision.model, effort: decision.effort }
+            $.ui.status(`This session: ${capital(decision.model)} · ${decision.effort} effort`)
+          }
+        }
+
+        await update($, mainRoute, () => route)
+      } catch {
+        // Undecided: the session keeps its own model, and the next turn asks again.
+      }
+    }
+
+    return next(e)
+  }).catch(($, e, next) => next(e))
+
   on('turn.step', async function* ($, e, next) {
     let effort = e.agentId !== undefined ? efforts.get(e.agentId) : undefined
 
@@ -318,7 +394,18 @@ export const register: Register = on => {
       }
     }
 
-    const step = effort !== undefined && e.effort !== effort ? { ...e, effort: effort as typeof e.effort } : e
+    // A worker main session runs on the model and effort chosen at its start.
+    const main = e.agentId === undefined ? await read($, mainRoute) : undefined
+    const model = main?.role === 'worker' ? main.model : e.model
+
+    if (main?.role === 'worker') {
+      effort = main.effort
+    }
+
+    const step =
+      (effort !== undefined && e.effort !== effort) || model !== e.model
+        ? { ...e, model, ...(effort !== undefined ? { effort: effort as typeof e.effort } : {}) }
+        : e
     const result = yield* next(step)
     const id = e.agentId ?? MAIN
 
