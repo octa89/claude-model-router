@@ -77,7 +77,7 @@ test('a harder task never gets a weaker model', () => {
 test('documented starting points', () => {
   assert.deepEqual(pick(decide(label({ category: 'chat_simple' }))), ['sonnet', 'low']);
   assert.deepEqual(pick(decide(label({ category: 'coding_routine' }))), ['sonnet', 'medium']);
-  assert.deepEqual(pick(decide(label({ category: 'coding_hard' }))), ['opus', 'medium']);
+  assert.deepEqual(pick(decide(label({ category: 'coding_hard' }))), ['sonnet', 'high']);
   assert.deepEqual(pick(decide(label({ category: 'deep_reasoning' }))), ['fable', 'high']);
 });
 
@@ -212,7 +212,7 @@ test('route falls back and reports why when the classifier fails', async () => {
 
   const unsure = await route('anything', { apiKey: 'k', fetchImpl: fakeFetch(decision({ p: 0.2 })) });
   assert.equal(unsure.source, 'fallback');
-  assert.deepEqual(pick(unsure), ['opus', 'medium']);
+  assert.deepEqual(pick(unsure), ['sonnet', 'high']);
 
   const noKey = await route('anything', { apiKey: '', fetchImpl: fakeFetch(decision()) });
   assert.equal(noKey.source, 'fallback');
@@ -295,15 +295,14 @@ test('names every object inherits are not mistaken for models or categories', ()
   assert.throws(() => readDecision(decision({ category: 'constructor' })), /unknown category/);
 });
 
-test('policy: Fable plans, reviews and runs long work; the rest stays at Opus or lower', () => {
+test('policy: Fable plans and reviews; execution is Sonnet, Opus only when hard', () => {
   const planning = ['orchestration', 'deep_reasoning', 'review_verify'];
   for (const category of Object.keys(ROUTES)) {
     for (const difficulty of DIFFICULTIES) {
-      const { model, effort } = decide(label({ category, difficulty }));
-      const isLongWork = category === 'long_autonomous' && difficulty !== 'easy';
+      const { model } = decide(label({ category, difficulty }));
       if (planning.includes(category)) assert.equal(model, 'fable', `${category}/${difficulty}`);
-      else if (isLongWork) assert.deepEqual([model, effort], ['fable', 'high'], `${category}/${difficulty}`);
-      else assert.notEqual(model, 'fable', `${category}/${difficulty}`);
+      else if (difficulty === 'hard') assert.notEqual(model, 'fable', `${category}/${difficulty}`);
+      else assert.equal(model, 'sonnet', `${category}/${difficulty}`);
     }
   }
 });

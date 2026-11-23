@@ -7,7 +7,7 @@
 // Rules it keeps:
 //   - A model or effort the session already chose for the subagent is left alone.
 //   - Any problem (no key, network, bad reply) never blocks the subagent: the
-//     router's safe default (Opus at medium) is used instead.
+//     router's safe default (Sonnet at high) is used instead.
 //   - Each decision is logged to router.log next to this file. The brief's text
 //     is not logged.
 //

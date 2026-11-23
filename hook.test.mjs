@@ -64,10 +64,10 @@ test('also handles the older tool name Task', async () => {
   assert.equal(out.hookSpecificOutput.updatedInput.model, 'sonnet');
 });
 
-test('a classifier failure still returns the safe default, Opus at medium', async () => {
+test('a classifier failure still returns the safe default, Sonnet at high', async () => {
   const out = await handle(event({ prompt: 'Anything at all' }), opts(fakeFetch({ error: 'down' }, 500)));
-  assert.equal(out.hookSpecificOutput.updatedInput.model, 'opus');
-  assert.equal(out.hookSpecificOutput.updatedInput.effort, 'medium');
+  assert.equal(out.hookSpecificOutput.updatedInput.model, 'sonnet');
+  assert.equal(out.hookSpecificOutput.updatedInput.effort, 'high');
 });
 
 test('a risky brief is raised to Opus', async () => {
@@ -81,7 +81,7 @@ test('shows the user a one-line banner with the choice', async () => {
   const risky = await handle(event({ prompt: 'Delete rows' }), opts(fakeFetch(reply('coding_routine', 'easy', 0.95))));
   assert.match(risky.systemMessage, /opus at medium effort .*high risk/);
   const failed = await handle(event({ prompt: 'Anything' }), opts(fakeFetch({}, 500)));
-  assert.equal(failed.systemMessage, 'Model router: opus at medium effort (safe default, Bison gave no clear answer)');
+  assert.equal(failed.systemMessage, 'Model router: sonnet at high effort (safe default, Bison gave no clear answer)');
 });
 
 test('the brief key is 32-bit FNV-1a in hex, the same one the status mod computes', async () => {

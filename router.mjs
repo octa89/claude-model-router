@@ -61,17 +61,17 @@ export const DIFFICULTIES = Object.keys(DIFFICULTY_CRITERIA);
 
 // category -> [easy, normal, hard] as "model:effort".
 //
-// Policy: Fable 5.2 plans, reviews and runs long unattended work; the rest of
-// the work goes to Opus 5.5 or lower.
+// Policy: Sonnet 5.5 does every task it can handle well; Opus 5.5 only takes
+// the hard ones; Fable 5.2 plans, designs and reviews.
 //   - Planning and design (orchestration, deep_reasoning) and every review run
 //     on Fable, at medium for easy work (the Fable guide: plan at medium) and
 //     high otherwise.
-//   - Long unattended work of normal or hard difficulty runs on Fable at high
-//     (the Fable guide: high for "long unattended runs"; it stops early more
-//     often at low and medium). Easy long work stays on Opus.
-//   - Other execution is capped at Opus: Sonnet 5.5 starts at low for chat,
-//     extraction and search and at medium for agentic coding; Opus 5.5 takes
-//     the harder work.
+//   - Execution (coding, research, long unattended builds) runs on Sonnet
+//     5.5 up to normal difficulty, at high effort for normal coding and long
+//     work so it does not stop early. Only hard execution goes to Opus 5.5.
+//     Builds are reviewed afterwards, and a failed subagent is retried once on
+//     Opus, so a weak first pass is caught.
+//   - Sonnet starts at low for chat, extraction and search.
 //   - xhigh and max are never chosen here: the docs reserve them for a
 //     measured gain. Escalation after a failure can still reach Fable.
 export const ROUTES = {
@@ -79,9 +79,9 @@ export const ROUTES = {
   chat_simple: ['sonnet:low', 'sonnet:low', 'sonnet:medium'],
   search_read: ['sonnet:low', 'sonnet:low', 'sonnet:medium'],
   coding_routine: ['sonnet:medium', 'sonnet:medium', 'sonnet:high'],
-  coding_hard: ['sonnet:high', 'opus:medium', 'opus:high'],
-  knowledge_research: ['sonnet:medium', 'opus:medium', 'opus:high'],
-  long_autonomous: ['opus:medium', 'fable:high', 'fable:high'],
+  coding_hard: ['sonnet:high', 'sonnet:high', 'opus:high'],
+  knowledge_research: ['sonnet:medium', 'sonnet:high', 'opus:high'],
+  long_autonomous: ['sonnet:medium', 'sonnet:high', 'opus:high'],
   deep_reasoning: ['fable:medium', 'fable:high', 'fable:high'],
   orchestration: ['fable:medium', 'fable:medium', 'fable:high'],
   review_verify: ['fable:medium', 'fable:high', 'fable:high'],
@@ -95,8 +95,9 @@ const HAIKU_ROUTES = {
   classify_extract: ['haiku:low', 'haiku:low', 'sonnet:low'],
 };
 
-// Anthropic: "If you're unsure which model to use, start with Claude Opus 5.5."
-export const FALLBACK = { model: 'opus', effort: 'medium' };
+// When the classifier is unsure: Sonnet at high. A failed subagent is retried
+// once on Opus, which is cheaper overall than starting every unsure task there.
+export const FALLBACK = { model: 'sonnet', effort: 'high' };
 // Below this probability for the chosen category, the safe default is used.
 export const MIN_CONFIDENCE = 0.5;
 // At or above this probability of "high risk", the Opus floor applies.

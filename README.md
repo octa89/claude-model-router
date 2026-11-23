@@ -12,7 +12,7 @@ Fixed rules then turn those answers into a model and an effort level. The rules 
 
 ## Policy
 
-**Fable 5.2 plans, reviews and runs long unattended work; the rest of the work goes to Opus 5.5 or lower.**
+**Sonnet 5.5 does every task it can handle well; Opus 5.5 takes only hard execution work; Fable 5.2 plans, designs and reviews.**
 
 | Task | Easy | Normal | Hard |
 |---|---|---|---|
@@ -20,16 +20,16 @@ Fixed rules then turn those answers into a model and an effort level. The rules 
 | Simple chat | Sonnet low | Sonnet low | Sonnet medium |
 | Search and read | Sonnet low | Sonnet low | Sonnet medium |
 | Routine coding | Sonnet medium | Sonnet medium | Sonnet high |
-| Hard coding | Sonnet high | Opus medium | Opus high |
-| Research and analysis | Sonnet medium | Opus medium | Opus high |
-| Long unattended work | Opus medium | Fable high | Fable high |
+| Hard coding | Sonnet high | Sonnet high | Opus high |
+| Research and analysis | Sonnet medium | Sonnet high | Opus high |
+| Long unattended work | Sonnet medium | Sonnet high | Opus high |
 | Deep reasoning, design (planning) | Fable medium | Fable high | Fable high |
 | Orchestrating other agents (planning) | Fable medium | Fable medium | Fable high |
 | Review and verification | Fable medium | Fable high | Fable high |
 
 Safety nets:
 
-- **Unsure or unavailable classifier.** If Bison fails, no key is set, or the chosen category has a probability under 0.5, the subagent gets Opus at medium. Subagents are never blocked.
+- **Unsure or unavailable classifier.** If Bison fails, no key is set, or the chosen category has a probability under 0.5, the subagent gets Sonnet at high; if it fails, it is retried once on Opus. Subagents are never blocked.
 - **Risky work.** A risk probability of 0.4 or more means at least Opus at medium.
 - **Fixed subagent types.** Subagents of type `Plan`, and any type with "review", "verif" or "audit" in its name, always get Fable.
 - **The session's own choice wins.** A model and effort the session already set for a subagent are left alone.
