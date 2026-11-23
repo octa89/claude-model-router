@@ -97,8 +97,20 @@ export async function handle(event, { logFile = LOG, ...routeOpts } = {}) {
   if (typeof input.prompt !== 'string' || !input.prompt.trim()) return null;
   // A fork always runs on its parent's model, so there is nothing to choose.
   if (input.subagent_type === 'fork') return null;
-  // An explicit choice by the session wins.
-  if (input.model && input.effort) return null;
+  // A model the session names itself is kept only for a retry: the same
+  // brief again, on a stronger model than the router gave it last time.
+  // Otherwise the router decides, so a coordinator that habitually names
+  // Fable or Opus cannot bypass it.
+  const key = briefKey(input.prompt);
+  const earlier = await previousDecision(logFile, key);
+  const askedFamily = familyOf(input.model);
+  const earlierRank = MODELS[familyOf(earlier?.model)]?.rank;
+  const isRetry = Boolean(askedFamily && earlierRank !== undefined && MODELS[askedFamily].rank > earlierRank);
+  const ignoredSessionModel = input.model && !isRetry ? String(input.model) : null;
+  if (ignoredSessionModel) {
+    delete input.model;
+    delete input.effort;
+  }
 
   const brief = [
     input.subagent_type ? `Subagent type: ${input.subagent_type}` : '',
@@ -131,8 +143,6 @@ export async function handle(event, { logFile = LOG, ...routeOpts } = {}) {
 
   // The same brief again on a stronger model: a retry after a failure. The
   // tuning report counts these as "needed a stronger model".
-  const key = briefKey(input.prompt);
-  const earlier = await previousDecision(logFile, key);
   const earlierFamily = familyOf(earlier?.model);
   const finalFamily = familyOf(model);
   const retryOf =
@@ -152,6 +162,7 @@ export async function handle(event, { logFile = LOG, ...routeOpts } = {}) {
     model,
     effort,
     ...(input.model ? { modelPickedBySession: true } : {}),
+    ...(ignoredSessionModel ? { ignoredSessionModel } : {}),
     ...(retryOf ? { retryOf } : {}),
     source: choice.source,
     category: choice.category,

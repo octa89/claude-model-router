@@ -41,16 +41,13 @@ test('fills in model and effort and keeps every other field', async () => {
   assert.match(f.calls[0].state.task, /List files importing the old logger/);
 });
 
-test('a model the session already chose is kept; only effort is filled in', async () => {
-  const f = fakeFetch(reply('deep_reasoning', 'hard'));
-  const out = await handle(event({ prompt: 'Design the system', model: 'sonnet' }), opts(f));
-  assert.equal(out.hookSpecificOutput.updatedInput.model, 'sonnet');
-  assert.equal(out.hookSpecificOutput.updatedInput.effort, 'high');
+test('a model and effort the session names on a first brief are replaced by the router', async () => {
+  const out = await handle(event({ prompt: 'Add a unit test', model: 'fable', effort: 'high' }), opts(fakeFetch(reply('coding_routine', 'easy'))));
+  assert.deepEqual([out.hookSpecificOutput.updatedInput.model, out.hookSpecificOutput.updatedInput.effort], ['sonnet', 'medium']);
 });
 
-test('stays out of the way when model and effort are both set, for forks, and for other tools', async () => {
+test('stays out of the way for forks, other tools and empty briefs', async () => {
   const f = fakeFetch(reply('chat_simple'));
-  assert.equal(await handle(event({ prompt: 'x', model: 'opus', effort: 'low' }), opts(f)), null);
   assert.equal(await handle(event({ prompt: 'x', subagent_type: 'fork' }), opts(f)), null);
   assert.equal(await handle(event({ prompt: 'x' }, { tool_name: 'Bash' }), opts(f)), null);
   assert.equal(await handle(event({ prompt: 'x' }, { hook_event_name: 'PostToolUse' }), opts(f)), null);
@@ -119,11 +116,17 @@ test('Plan and review subagent types always get Opus, the coordinator, even for 
 
 // --- retries and the closer log ---
 
-test('a model the session picks gets that model\'s own starting effort', async () => {
-  const out = await handle(event({ prompt: 'Add a unit test', model: 'opus' }), opts(fakeFetch(reply('coding_routine', 'easy'))));
-  assert.deepEqual([out.hookSpecificOutput.updatedInput.model, out.hookSpecificOutput.updatedInput.effort], ['opus', 'medium']);
-  const same = await handle(event({ prompt: 'Add a unit test', model: 'sonnet' }), opts(fakeFetch(reply('coding_routine', 'easy'))));
-  assert.equal(same.hookSpecificOutput.updatedInput.effort, 'medium', 'the router\'s own effort when it chose that model too');
+test('a retry on a stronger model is kept, with that model\'s own starting effort', async () => {
+  const { mkdtemp } = await import('node:fs/promises');
+  const { tmpdir } = await import('node:os');
+  const { join } = await import('node:path');
+  const logFile = join(await mkdtemp(join(tmpdir(), 'hook-pick-')), 'router.log');
+  const run = (input) => handle(event(input), { apiKey: 'k', fetchImpl: fakeFetch(reply('coding_routine', 'easy')), logFile });
+  await run({ prompt: 'Add a unit test' });
+  const retry = await run({ prompt: 'Add a unit test', model: 'opus' });
+  assert.deepEqual([retry.hookSpecificOutput.updatedInput.model, retry.hookSpecificOutput.updatedInput.effort], ['opus', 'medium']);
+  const notStronger = await run({ prompt: 'Add a unit test', model: 'sonnet' });
+  assert.equal(notStronger.hookSpecificOutput.updatedInput.model, 'sonnet', 'the router\'s own choice');
 });
 
 test('the same brief again on a stronger model is logged as a retry, with its title', async () => {
