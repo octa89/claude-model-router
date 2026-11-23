@@ -31,6 +31,7 @@ Safety nets:
 
 - **Unsure or unavailable classifier.** If Bison fails, no key is set, or the chosen category has a probability under 0.5, the subagent gets Sonnet at high; if it fails, it is retried once on Opus. Subagents are never blocked.
 - **Risky work.** A risk probability of 0.4 or more means at least Opus at medium.
+- **Fixed routes by type.** `Explore`, `web-fetch`, `claude-code-guide`, `statusline-setup`, `caveman:cavecrew-investigator` and `codex:codex-rescue` always get Sonnet at low, without asking the classifier: they only read, or relay Codex's work.
 - **Fixed subagent types.** Subagents of type `Plan`, and any type with "review", "verif" or "audit" in its name, always get Fable.
 - **The session's own choice wins.** A model and effort the session already set for a subagent are left alone.
 - **Effort ceiling.** `xhigh` and `max` are never chosen by the rules.

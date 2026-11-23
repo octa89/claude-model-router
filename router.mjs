@@ -87,6 +87,18 @@ export const ROUTES = {
   review_verify: ['fable:medium', 'fable:high', 'fable:high'],
 };
 
+// Subagent types whose work is fixed and read-only, or only relays another
+// model's work (codex-rescue runs the Codex CLI). They skip the classifier:
+// no wait, no rate limits, and no risk to weigh because they change nothing.
+export const TYPE_ROUTES = {
+  Explore: 'sonnet:low',
+  'web-fetch': 'sonnet:low',
+  'claude-code-guide': 'sonnet:low',
+  'statusline-setup': 'sonnet:low',
+  'caveman:cavecrew-investigator': 'sonnet:low',
+  'codex:codex-rescue': 'sonnet:low',
+};
+
 // Subagent types that always plan or review, whatever Bison says: Fable at least.
 export const FABLE_SUBAGENT_TYPES = /^(plan|planner)$|review|verif|audit/i;
 

@@ -17,7 +17,7 @@ import { execFileSync } from 'node:child_process';
 import { appendFile, readFile } from 'node:fs/promises';
 import { basename, dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { EFFORTS, FABLE_SUBAGENT_TYPES, MODELS, route } from './router.mjs';
+import { EFFORTS, FABLE_SUBAGENT_TYPES, MODELS, TYPE_ROUTES, route } from './router.mjs';
 
 const LOG = join(dirname(fileURLToPath(import.meta.url)), 'router.log');
 const SUBAGENT_TOOLS = ['Agent', 'Task'];
@@ -111,11 +111,14 @@ export async function handle(event, { logFile = LOG, ...routeOpts } = {}) {
   // Planning and review subagents always run on Fable 5.2.
   const isPlanOrReview = FABLE_SUBAGENT_TYPES.test(input.subagent_type ?? '');
   const startedAt = Date.now();
-  const choice = await route(brief, {
-    timeoutMs: CLASSIFY_TIMEOUT_MS,
-    ...(isPlanOrReview ? { minModel: 'fable' } : {}),
-    ...routeOpts,
-  });
+  const fixed = Object.hasOwn(TYPE_ROUTES, input.subagent_type ?? '') ? TYPE_ROUTES[input.subagent_type].split(':') : null;
+  const choice = fixed
+    ? { model: fixed[0], effort: fixed[1], source: 'type', category: null, difficulty: null, confidence: null }
+    : await route(brief, {
+        timeoutMs: CLASSIFY_TIMEOUT_MS,
+        ...(isPlanOrReview ? { minModel: 'fable' } : {}),
+        ...routeOpts,
+      });
   const model = input.model || choice.model;
   const pickedFamily = familyOf(input.model);
   // A model the session picked, without an effort: the higher of the router's
@@ -165,7 +168,9 @@ export async function handle(event, { logFile = LOG, ...routeOpts } = {}) {
 
   // One line shown to the user in the session each time a subagent is routed.
   const why =
-    choice.source === 'classifier'
+    choice.source === 'type'
+      ? `fixed for ${input.subagent_type}`
+      : choice.source === 'classifier'
       ? `${choice.category}, ${choice.difficulty}` +
         (typeof choice.confidence === 'number' ? `, ${Math.round(choice.confidence * 100)}% sure` : '') +
         (choice.risk === 'high' ? ', high risk' : '')

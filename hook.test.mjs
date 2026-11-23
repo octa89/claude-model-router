@@ -30,14 +30,14 @@ const opts = (fetchImpl) => ({ apiKey: 'k', fetchImpl, logFile: null });
 
 test('fills in model and effort and keeps every other field', async () => {
   const f = fakeFetch(reply('search_read', 'easy'));
-  const input = { description: 'Find old imports', prompt: 'List files importing the old logger', subagent_type: 'Explore' };
+  const input = { description: 'Find old imports', prompt: 'List files importing the old logger', subagent_type: 'general-purpose' };
   const out = await handle(event(input), opts(f));
   assert.deepEqual(out.hookSpecificOutput, {
     hookEventName: 'PreToolUse',
     updatedInput: { ...input, model: 'sonnet', effort: 'low' },
   });
   assert.equal(out.hookSpecificOutput.permissionDecision, undefined, 'does not change permissions');
-  assert.match(f.calls[0].state.task, /Subagent type: Explore/);
+  assert.match(f.calls[0].state.task, /Subagent type: general-purpose/);
   assert.match(f.calls[0].state.task, /List files importing the old logger/);
 });
 
@@ -141,4 +141,15 @@ test('the same brief again on a stronger model is logged as a retry, with its ti
   assert.equal(retry.modelPickedBySession, true);
   assert.equal(retry.model, 'opus');
   assert.equal(other.retryOf, undefined, 'a new brief is not a retry');
+});
+
+test('read-only and relay subagent types use a fixed route without the classifier', async () => {
+  let called = false;
+  const fetchImpl = async () => { called = true; throw new Error('should not be called'); };
+  for (const subagent_type of ['Explore', 'web-fetch', 'codex:codex-rescue']) {
+    const out = await handle(event({ prompt: 'Look around', subagent_type }), { apiKey: 'k', fetchImpl, logFile: null });
+    assert.deepEqual([out.hookSpecificOutput.updatedInput.model, out.hookSpecificOutput.updatedInput.effort], ['sonnet', 'low'], subagent_type);
+    assert.match(out.systemMessage, new RegExp('fixed for ' + subagent_type));
+  }
+  assert.equal(called, false);
 });
