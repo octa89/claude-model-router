@@ -1,0 +1,53 @@
+{
+  "about": "Head-to-head tasks. Each runs in a fresh copy of fixture/. A check is either hidden tests (copied in after the run, never shown to the model) or a pattern the final answer must match. Add your own tasks in the same shape; real tasks from your work make the results far more meaningful.",
+  "tasks": [
+    {
+      "id": "t1-find",
+      "kind": "search_read / easy",
+      "prompt": "Which file in this project defines the function applyDiscount? Reply with exactly one line: PATH=<path relative to the project root>.",
+      "check": { "answer": "PATH=\\.?/?src[/\\\\]discounts\\.js" }
+    },
+    {
+      "id": "t2-format",
+      "kind": "coding_hard / easy",
+      "prompt": "formatPrice in src/format.js gives wrong output for negative prices and for fractional cents. Fix it so it matches its doc comment.",
+      "check": { "tests": "format.check.js" }
+    },
+    {
+      "id": "t3-slug",
+      "kind": "coding_routine / normal",
+      "prompt": "Implement slugify in src/slug.js so it does exactly what its doc comment says, and add tests for it in test/.",
+      "check": { "tests": "slug.check.js" }
+    },
+    {
+      "id": "t4-groupby",
+      "kind": "coding_routine / easy",
+      "prompt": "Implement groupBy in src/collections.js as its doc comment describes.",
+      "check": { "tests": "groupby.check.js" }
+    },
+    {
+      "id": "t5-cart",
+      "kind": "coding_hard / normal",
+      "prompt": "Customers report being charged too little when they enter two promotion codes on one order. Find the cause in the cart code and fix it, keeping the documented behaviour.",
+      "check": { "tests": "cart.check.js" }
+    },
+    {
+      "id": "t6-schedule",
+      "kind": "coding_hard / hard",
+      "prompt": "Implement freeSlots in src/schedule.js. Read its doc comment carefully: the input can be messy, and the edge cases matter. Add tests that cover them.",
+      "check": { "tests": "schedule.check.js" }
+    },
+    {
+      "id": "t7-orders",
+      "kind": "classify_extract / normal",
+      "prompt": "Read data/orders.txt and write data/orders.json: a JSON array of objects {id (number), customer (string), total (number)} for every valid line, in file order. Skip comments, blank lines, malformed lines, lines whose total is not a number, and lines with an empty customer. Trim spaces around keys and values.",
+      "check": { "tests": "orders.check.js" }
+    },
+    {
+      "id": "t8-review",
+      "kind": "review_verify / normal",
+      "prompt": "Review src/refund.js for bugs. Do not change any file. Reply with exactly one line: LINE=<line number of the most serious bug>, then one sentence saying what is wrong.",
+      "check": { "answer": "LINE=(5|6)\\b" }
+    }
+  ]
+}

@@ -64,6 +64,33 @@ It shows one row per cell of the routing table: how many tasks it got, the avera
 
 Costs are estimates from token counts and the list prices in `report.mjs`. The brief's text is never stored. Both files stay on your machine and are ignored by git.
 
+## Evaluating the router
+
+Two evaluations live in `eval/`. Their results go to `eval/results/` and `eval/runs/`, which git ignores.
+
+**Level 1: is the classifier right, honest and fast?** `eval/classifier-set.json` holds 66 hand-labelled task briefs. This sends each to the classifier twice (about $0.003 in all) and reports accuracy, the most common mix-ups, calibration, risk recall at several thresholds, where the router then sends each task compared with the labels, stability, and latency:
+
+```
+node eval/classifier.mjs
+```
+
+**Level 2: does routing beat Anthropic's default on real work?** `eval/e2e/` holds a small project with bugs and unfinished functions, eight tasks, and hidden checks the model never sees. Each task runs in a fresh copy of the project with headless Claude Code under four setups:
+
+| Setup | Model |
+|---|---|
+| `baseline` | Opus 5.5 at medium, Anthropic's recommended starting point |
+| `router` | the router's pick for the task |
+| `fable` | Fable 5.2 at high, the quality ceiling |
+| `random` | the router's own picks shuffled between tasks: same mix, no judgement |
+
+```
+node eval/e2e/run.mjs --dry-run           # the plan and the router's picks; spends nothing
+node eval/e2e/run.mjs --budget-usd 15     # run it; stops starting runs past the budget
+node eval/e2e/run.mjs --report <file>     # report an earlier run again
+```
+
+It reports pass rate, cost per solved task and time for each setup, and the router against the others. The router earns its place only if it matches the baseline's pass rate for less money, and beats `random`. Eight tasks is a start: add tasks from your own work to `tasks.json` (with a hidden check in `hidden/` and, ideally, a correct answer in `reference/`), and use `--repeats` before acting on small differences. `node --test` checks that every hidden check fails on the untouched project and passes on the reference answer.
+
 ## Install
 
 Needs Claude Code, Node 20 or newer, and an [OpenRouter](https://openrouter.ai) API key. Tested on Windows.

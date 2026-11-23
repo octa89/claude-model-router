@@ -1,0 +1,8 @@
+# exported 2026-11-01
+id=1001; customer=Ana Ruiz; total=19.99
+id=1002 ; customer = Bo Li ; total = 5
+broken line without fields
+id=1003; customer=Cy Doe; total=abc
+
+id=1004; customer=Dee Park; total=120.50
+id=1005; customer=; total=7

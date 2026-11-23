@@ -1,0 +1,81 @@
+{
+  "about": "Hand-labelled task briefs for checking the classifier. category and difficulty use the router's names; risk is high when the task could cause damage that is hard to undo. Review the labels: the evaluation is only as good as they are.",
+  "tasks": [
+    { "id": "ce1", "category": "classify_extract", "difficulty": "easy", "risk": "low", "text": "Pull the invoice number, date and total out of each of these 12 emails and return them as a CSV." },
+    { "id": "ce2", "category": "classify_extract", "difficulty": "easy", "risk": "low", "text": "Label each of these 40 support tickets as bug, question or feature request." },
+    { "id": "ce3", "category": "classify_extract", "difficulty": "normal", "risk": "low", "text": "Convert this YAML config file to JSON, keeping comments as a separate notes field." },
+    { "id": "ce4", "category": "classify_extract", "difficulty": "normal", "risk": "low", "text": "From these meeting notes, extract every action item with its owner and due date into a table." },
+    { "id": "ce5", "category": "classify_extract", "difficulty": "hard", "risk": "low", "text": "Extract the parties, term, renewal clauses and termination conditions from these three 40-page supplier contracts into a comparison table, noting where the wording is ambiguous." },
+    { "id": "ce6", "category": "classify_extract", "difficulty": "hard", "risk": "low", "text": "Normalise 2,000 messy address strings from five countries into street, city, postcode and country fields, flagging ones that cannot be parsed." },
+
+    { "id": "ch1", "category": "chat_simple", "difficulty": "easy", "risk": "low", "text": "What does HTTP status code 409 mean?" },
+    { "id": "ch2", "category": "chat_simple", "difficulty": "easy", "risk": "low", "text": "Write a two-line commit message for a change that renames a variable." },
+    { "id": "ch3", "category": "chat_simple", "difficulty": "normal", "risk": "low", "text": "Explain the difference between a mutex and a semaphore with a short example." },
+    { "id": "ch4", "category": "chat_simple", "difficulty": "normal", "risk": "low", "text": "Draft a short, friendly reply to a customer asking when the next release ships." },
+    { "id": "ch5", "category": "chat_simple", "difficulty": "hard", "risk": "low", "text": "Explain in plain words, for a non-technical manager, why our latency got worse after moving to microservices." },
+    { "id": "ch6", "category": "chat_simple", "difficulty": "hard", "risk": "low", "text": "Summarise the trade-offs between eventual and strong consistency for a team deciding on a database, in under 300 words." },
+
+    { "id": "sr1", "category": "search_read", "difficulty": "easy", "risk": "low", "text": "Find every file in the repo that imports the old logging module and list their paths." },
+    { "id": "sr2", "category": "search_read", "difficulty": "easy", "risk": "low", "text": "Where is the function parseConfig defined? Give the file and line." },
+    { "id": "sr3", "category": "search_read", "difficulty": "normal", "risk": "low", "text": "Read the payments module and summarise how a refund flows from the API call to the database." },
+    { "id": "sr4", "category": "search_read", "difficulty": "normal", "risk": "low", "text": "List every place a feature flag is read in the frontend and which flag each one uses." },
+    { "id": "sr5", "category": "search_read", "difficulty": "hard", "risk": "low", "text": "Trace every code path that can write to the users table across the three services and report which ones skip validation." },
+    { "id": "sr6", "category": "search_read", "difficulty": "hard", "risk": "low", "text": "Map how authentication tokens are created, refreshed and revoked across the monorepo, with file references for each step." },
+
+    { "id": "cr1", "category": "coding_routine", "difficulty": "easy", "risk": "low", "text": "Rename the variable userNm to userName in src/profile.ts." },
+    { "id": "cr2", "category": "coding_routine", "difficulty": "easy", "risk": "low", "text": "Add a unit test for formatCurrency covering negative numbers." },
+    { "id": "cr3", "category": "coding_routine", "difficulty": "normal", "risk": "low", "text": "Add a --verbose flag to the CLI that prints each file as it is processed, with a test." },
+    { "id": "cr4", "category": "coding_routine", "difficulty": "normal", "risk": "low", "text": "Implement a slugify function in utils.js per the spec in the docstring and add tests." },
+    { "id": "cr5", "category": "coding_routine", "difficulty": "hard", "risk": "low", "text": "Add pagination to the three list endpoints, following the existing cursor pattern in the orders endpoint, with tests for each." },
+    { "id": "cr6", "category": "coding_routine", "difficulty": "hard", "risk": "low", "text": "Write the CRUD handlers and tests for a new tags resource, matching how the categories resource is built." },
+
+    { "id": "chd1", "category": "coding_hard", "difficulty": "easy", "risk": "low", "text": "The date picker shows yesterday's date for users in UTC-5 only. Find and fix the cause; it is in one file." },
+    { "id": "chd2", "category": "coding_hard", "difficulty": "easy", "risk": "low", "text": "A test fails intermittently about one run in ten. Find why and make it reliable." },
+    { "id": "chd3", "category": "coding_hard", "difficulty": "normal", "risk": "low", "text": "Refactor the billing module across 6 files and find out why the retry logic sometimes charges a customer twice." },
+    { "id": "chd4", "category": "coding_hard", "difficulty": "normal", "risk": "low", "text": "Our API p99 latency doubled after last week's deploy and nobody knows why. Investigate and fix it." },
+    { "id": "chd5", "category": "coding_hard", "difficulty": "hard", "risk": "low", "text": "Replace the hand-rolled event loop in the sync engine with async/await across 14 files without changing behaviour, keeping all integration tests green." },
+    { "id": "chd6", "category": "coding_hard", "difficulty": "hard", "risk": "low", "text": "Find and fix the memory leak that makes the worker process grow to 4 GB over two days; it only shows under production traffic patterns." },
+
+    { "id": "kr1", "category": "knowledge_research", "difficulty": "easy", "risk": "low", "text": "Find the current rate limits for the GitHub REST API and summarise them." },
+    { "id": "kr2", "category": "knowledge_research", "difficulty": "easy", "risk": "low", "text": "Look up which Node.js version introduced the built-in test runner and cite the release notes." },
+    { "id": "kr3", "category": "knowledge_research", "difficulty": "normal", "risk": "low", "text": "Compare three vector databases for our use case and write a recommendation with trade-offs." },
+    { "id": "kr4", "category": "knowledge_research", "difficulty": "normal", "risk": "low", "text": "Research how competitors price their API tiers and summarise the patterns in a one-page report." },
+    { "id": "kr5", "category": "knowledge_research", "difficulty": "hard", "risk": "low", "text": "Survey the published evidence on LLM routing, weigh the methods against each other, and recommend one for a small team with citations." },
+    { "id": "kr6", "category": "knowledge_research", "difficulty": "hard", "risk": "low", "text": "Analyse two years of our usage data alongside market reports to estimate demand for a self-hosted edition, stating your assumptions." },
+
+    { "id": "dr1", "category": "deep_reasoning", "difficulty": "easy", "risk": "low", "text": "Choose between a queue and a cron job for sending daily digest emails and justify it in a paragraph." },
+    { "id": "dr2", "category": "deep_reasoning", "difficulty": "easy", "risk": "low", "text": "Decide whether this new field belongs on the orders table or a separate table, and explain why." },
+    { "id": "dr3", "category": "deep_reasoning", "difficulty": "normal", "risk": "low", "text": "Design the data model for multi-tenant permissions with roles, groups and per-resource overrides." },
+    { "id": "dr4", "category": "deep_reasoning", "difficulty": "normal", "risk": "low", "text": "Design the caching strategy for the product catalogue, covering invalidation and stampede protection." },
+    { "id": "dr5", "category": "deep_reasoning", "difficulty": "hard", "risk": "low", "text": "Design the architecture for moving our monolith to event-driven services, including the migration order, data ownership and the main risks." },
+    { "id": "dr6", "category": "deep_reasoning", "difficulty": "hard", "risk": "low", "text": "Prove or disprove that our scheduling algorithm can deadlock when two tenants share a resource pool, and propose a fix." },
+
+    { "id": "la1", "category": "long_autonomous", "difficulty": "easy", "risk": "low", "text": "Go through all 30 markdown docs, fix broken internal links, and report what you changed. Work until done." },
+    { "id": "la2", "category": "long_autonomous", "difficulty": "easy", "risk": "low", "text": "Update every dependency to its latest patch version, run the tests after each, and stop at the first failure." },
+    { "id": "la3", "category": "long_autonomous", "difficulty": "normal", "risk": "low", "text": "Migrate the test suite from Jest to the Node test runner overnight, fixing failures until everything passes." },
+    { "id": "la4", "category": "long_autonomous", "difficulty": "normal", "risk": "low", "text": "Add type annotations to every function in the 80-file Python package and get mypy to pass without supervision." },
+    { "id": "la5", "category": "long_autonomous", "difficulty": "hard", "risk": "low", "text": "Migrate the whole codebase from JavaScript to TypeScript overnight without supervision, fixing type errors until the build and all tests pass." },
+    { "id": "la6", "category": "long_autonomous", "difficulty": "hard", "risk": "low", "text": "Port the Python data pipeline to Rust over the weekend, keeping outputs byte-identical on the regression fixtures." },
+
+    { "id": "or1", "category": "orchestration", "difficulty": "easy", "risk": "low", "text": "Split this list of 12 files between three helper agents for formatting, then collect their results." },
+    { "id": "or2", "category": "orchestration", "difficulty": "easy", "risk": "low", "text": "Send each of the five services to a helper to check its README is up to date, then summarise the answers." },
+    { "id": "or3", "category": "orchestration", "difficulty": "normal", "risk": "low", "text": "Split this research project into parts, hand each part to a helper agent, then merge their findings into one report." },
+    { "id": "or4", "category": "orchestration", "difficulty": "normal", "risk": "low", "text": "Plan the work to add dark mode across the app, assign the pieces to helper agents, and review what they return." },
+    { "id": "or5", "category": "orchestration", "difficulty": "hard", "risk": "low", "text": "Coordinate six agents to migrate 40 microservices to the new logging library, sequencing them by dependency and resolving conflicts between their changes." },
+    { "id": "or6", "category": "orchestration", "difficulty": "hard", "risk": "low", "text": "Break the security audit of the platform into workstreams, delegate them, reconcile contradictory findings, and produce one prioritised plan." },
+
+    { "id": "rv1", "category": "review_verify", "difficulty": "easy", "risk": "low", "text": "Check that the README's install steps still match the package.json scripts." },
+    { "id": "rv2", "category": "review_verify", "difficulty": "easy", "risk": "low", "text": "Review this 20-line pull request that adds a log line and say whether it is fine to merge." },
+    { "id": "rv3", "category": "review_verify", "difficulty": "normal", "risk": "low", "text": "Review the pull request another agent wrote for the refund flow and check it for bugs." },
+    { "id": "rv4", "category": "review_verify", "difficulty": "normal", "risk": "low", "text": "Verify that the new caching layer actually invalidates on every write path; report any you can find that it misses." },
+    { "id": "rv5", "category": "review_verify", "difficulty": "hard", "risk": "low", "text": "Audit the authentication changes in this 2,000-line diff for security flaws, including timing attacks and token reuse." },
+    { "id": "rv6", "category": "review_verify", "difficulty": "hard", "risk": "low", "text": "Check whether the proof in this design document that the protocol is linearizable is correct, and point out any gap." },
+
+    { "id": "hr1", "category": "coding_routine", "difficulty": "easy", "risk": "high", "text": "Delete all rows from the production customers table where last_login is before 2023." },
+    { "id": "hr2", "category": "coding_routine", "difficulty": "normal", "risk": "high", "text": "Rotate the database password and update it in the production secrets store." },
+    { "id": "hr3", "category": "coding_routine", "difficulty": "easy", "risk": "high", "text": "Run the migration that drops the legacy_orders table on the live database." },
+    { "id": "hr4", "category": "long_autonomous", "difficulty": "normal", "risk": "high", "text": "Clean up old S3 buckets in the production account that look unused, deleting them as you go." },
+    { "id": "hr5", "category": "coding_routine", "difficulty": "easy", "risk": "high", "text": "Force-push the cleaned history to main so the leaked commit disappears." },
+    { "id": "hr6", "category": "coding_hard", "difficulty": "normal", "risk": "high", "text": "Issue refunds for every order affected by yesterday's double-charge bug using the payments API." }
+  ]
+}

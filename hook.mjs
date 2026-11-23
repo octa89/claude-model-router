@@ -82,6 +82,7 @@ export async function handle(event, { logFile = LOG, ...routeOpts } = {}) {
 
   // Planning and review subagents always run on Fable 5.2.
   const isPlanOrReview = FABLE_SUBAGENT_TYPES.test(input.subagent_type ?? '');
+  const startedAt = Date.now();
   const choice = await route(brief, {
     timeoutMs: CLASSIFY_TIMEOUT_MS,
     ...(isPlanOrReview ? { minModel: 'fable' } : {}),
@@ -103,6 +104,8 @@ export async function handle(event, { logFile = LOG, ...routeOpts } = {}) {
     difficulty: choice.difficulty,
     confidence: choice.confidence,
     riskProbability: choice.riskProbability ?? null,
+    // How long the decision took, classifier call included.
+    ms: Date.now() - startedAt,
     ...(choice.classifierError ? { error: choice.classifierError } : {}),
   });
 
@@ -129,7 +132,8 @@ async function main() {
   for await (const chunk of process.stdin) raw += chunk;
   const event = JSON.parse(raw.replace(/^\uFEFF/, ''));
   process.env.OPENROUTER_API_KEY ||= savedUserVariable('OPENROUTER_API_KEY') ?? '';
-  const output = await handle(event);
+  // ROUTER_LOG=off: decide without logging (the evaluations use this).
+  const output = await handle(event, process.env.ROUTER_LOG === 'off' ? { logFile: null } : {});
   if (output) process.stdout.write(JSON.stringify(output));
 }
 
