@@ -115,3 +115,30 @@ test('Plan and review subagent types always get Fable, even for an easy brief', 
   const explore = await handle(event({ prompt: 'Look at this', subagent_type: 'Explore' }), opts(fakeFetch(reply('search_read', 'easy'))));
   assert.equal(explore.hookSpecificOutput.updatedInput.model, 'sonnet');
 });
+
+// --- retries and the closer log ---
+
+test('a model the session picks gets that model\'s own starting effort', async () => {
+  const out = await handle(event({ prompt: 'Add a unit test', model: 'opus' }), opts(fakeFetch(reply('coding_routine', 'easy'))));
+  assert.deepEqual([out.hookSpecificOutput.updatedInput.model, out.hookSpecificOutput.updatedInput.effort], ['opus', 'medium']);
+  const same = await handle(event({ prompt: 'Add a unit test', model: 'sonnet' }), opts(fakeFetch(reply('coding_routine', 'easy'))));
+  assert.equal(same.hookSpecificOutput.updatedInput.effort, 'medium', 'the router\'s own effort when it chose that model too');
+});
+
+test('the same brief again on a stronger model is logged as a retry, with its title', async () => {
+  const { mkdtemp, readFile } = await import('node:fs/promises');
+  const { tmpdir } = await import('node:os');
+  const { join } = await import('node:path');
+  const logFile = join(await mkdtemp(join(tmpdir(), 'hook-retry-')), 'router.log');
+  const brief = { prompt: 'Implement the parser', description: 'Implement CSV parser' };
+  await handle(event(brief), { apiKey: 'k', fetchImpl: fakeFetch(reply('coding_routine', 'easy')), logFile });
+  await handle(event({ ...brief, model: 'opus' }), { apiKey: 'k', fetchImpl: fakeFetch(reply('coding_routine', 'easy')), logFile });
+  await handle(event({ prompt: 'Something else', model: 'opus' }), { apiKey: 'k', fetchImpl: fakeFetch(reply('coding_routine', 'easy')), logFile });
+  const [first, retry, other] = (await readFile(logFile, 'utf8')).trim().split('\n').map((l) => JSON.parse(l));
+  assert.equal(first.description, 'Implement CSV parser');
+  assert.equal(first.retryOf, undefined);
+  assert.equal(retry.retryOf, 'sonnet medium');
+  assert.equal(retry.modelPickedBySession, true);
+  assert.equal(retry.model, 'opus');
+  assert.equal(other.retryOf, undefined, 'a new brief is not a retry');
+});

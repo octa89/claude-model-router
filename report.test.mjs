@@ -49,3 +49,41 @@ test('summarize joins decisions, outcomes and ratings by brief key', () => {
   const unsure = rows.find((r) => r.cell.startsWith('safe default'));
   assert.equal(unsure.chosen, 'opus medium');
 });
+
+test('a retry counts against the first choice as "needed stronger", not as a decision', () => {
+  const decisions = [decision('k1'), decision('k1', { model: 'opus', effort: 'medium', retryOf: 'sonnet low', category: 'coding_routine' })];
+  const outcomes = [
+    { key: 'k1', model: 'claude-sonnet-5-5', durationMs: 1000, tokens: { input: 1e6, output: 0, cacheRead: 0, cacheWrite: 0 } },
+    { key: 'k1', model: 'claude-opus-5-5', durationMs: 1000, tokens: { input: 1e6, output: 0, cacheRead: 0, cacheWrite: 0 } },
+  ];
+  const rows = summarize(decisions, outcomes, []);
+  assert.equal(rows.length, 1, 'no row of its own for the retry');
+  const [row] = rows;
+  assert.equal(row.decisions, 1);
+  assert.equal(row.retried, 1);
+  assert.equal(row.runs, 1, 'one task, not two');
+  assert.equal(row.cost.toFixed(2), '6.00', 'the retry on Opus ($4) is charged to the first choice ($2)');
+});
+
+test('retries push the suggestion up', () => {
+  assert.equal(suggest({ right: 2, stronger: 0, cheaper: 0, retried: 1 }), 'raise one step');
+});
+
+test('bySession splits the main session\'s cost from its subagents\'', async () => {
+  const { bySession } = await import('./report.mjs');
+  const decisions = [decision('a', { session: 's1', project: 'MagmaStudio', time: '2026-11-23T01:00:00Z' })];
+  const outcomes = [
+    { type: 'main-turn', session: 's1', project: 'MagmaStudio', model: 'claude-opus-5-5', time: '2026-11-23T01:05:00Z', tokens: { input: 1e6, output: 0, cacheRead: 0, cacheWrite: 0 } },
+    { type: 'outcome', session: 's1', key: 'a', model: 'claude-sonnet-5-5', time: '2026-11-23T01:02:00Z', tokens: { input: 1e6, output: 0, cacheRead: 0, cacheWrite: 0 } },
+  ];
+  const [s] = bySession(decisions, outcomes);
+  assert.equal(s.project, 'MagmaStudio');
+  assert.equal(s.mainCost.toFixed(2), '4.00');
+  assert.equal(s.subCost.toFixed(2), '2.00');
+  assert.deepEqual([...s.models].sort(), ['opus', 'sonnet']);
+});
+
+test('main-session turns are not joined to routing cells', () => {
+  const rows = summarize([decision('a')], [{ type: 'main-turn', key: '', model: 'claude-opus-5-5', tokens: { input: 1, output: 1, cacheRead: 0, cacheWrite: 0 } }], []);
+  assert.equal(rows[0].runs, 0);
+});

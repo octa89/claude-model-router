@@ -16,6 +16,24 @@ async function sessionFile($: EngineInterface, kind: 'outcomes' | 'ratings'): Pr
   return `${$.plugin.root}/../tuning/${kind}-${await $.session.id()}.jsonl`
 }
 
+// The main session's entry in the map of tracked turns.
+const MAIN = 'main'
+
+/** The project folder's name, as the router's hook logs it. */
+async function projectName($: EngineInterface): Promise<string> {
+  const cwd = await $.session.cwd()
+  return cwd.split(/[\\/]/).filter(Boolean).pop() ?? cwd
+}
+
+// Standing instruction for the main session: one retry on Opus when a
+// subagent the router sent to a cheaper model fails a check. Measured: a
+// Sonnet run that failed passed on Opus; Anthropic found "run cheap, re-run
+// failures higher" holds the pass rate for about 40% less.
+const RETRY_RULE = [
+  'Model router: subagents are routed to a model and effort automatically.',
+  'When a subagent that ran on Sonnet or Haiku fails a check you can see (tests or build fail, a checker rejects it, or its result is plainly wrong or incomplete), start it once more with the same brief and model "opus" on the Agent call. Retry once only; for a failure on Opus or Fable, handle it as you normally would.',
+].join(' ')
+
 async function appendLine($: EngineInterface, path: string, entry: object): Promise<void> {
   let text = ''
 
@@ -163,8 +181,22 @@ export const register: Register = on => {
     return next(e)
   })
 
-  // Subagents being tracked for their outcome line, by agent id.
+  // Turns being tracked for their outcome line: subagents by agent id, and
+  // the main session as MAIN.
   const runs = new Map<string, Run>()
+
+  // The retry rule, for a prompt that can start subagents.
+  on('prompt.compose', async ($, e, next) => {
+    const composed = await next(e)
+
+    if (!e.tools.includes('Agent')) {
+      return composed
+    }
+
+    return {
+      sections: [...composed.sections, { id: 'router-status:retry', text: RETRY_RULE, scope: 'session' as const }],
+    }
+  })
 
   // Remember which brief each subagent was started with, to join its outcome
   // to the router's decision.
@@ -203,7 +235,14 @@ export const register: Register = on => {
   on('turn.step', async function* ($, e, next) {
     const step = e.agentId === undefined && isPlanning && !isFable(e.model) ? { ...e, model: PLAN_MODEL } : e
     const result = yield* next(step)
-    const run = e.agentId === undefined ? undefined : runs.get(e.agentId)
+    const id = e.agentId ?? MAIN
+
+    // The main session is tracked too, so a session's whole cost is in the log.
+    if (id === MAIN && !runs.has(MAIN)) {
+      runs.set(MAIN, { key: '', subagentType: 'main', model: step.model, steps: 0, input: 0, output: 0, cacheRead: 0, cacheWrite: 0 })
+    }
+
+    const run = runs.get(id)
 
     if (run !== undefined && result?.usage) {
       run.steps += 1
@@ -217,18 +256,20 @@ export const register: Register = on => {
     return result
   })
 
-  // A subagent's turn ended: write its outcome line, then count afresh for a
-  // later turn of the same subagent.
+  // A turn ended, the main session's or a subagent's: write its line, then
+  // count afresh for the next turn.
   on('turn.complete', async ($, e, next) => {
     const result = await next(e)
-    const run = e.agentId === undefined ? undefined : runs.get(e.agentId)
+    const id = e.agentId ?? MAIN
+    const run = runs.get(id)
 
-    if (run !== undefined) {
+    if (run !== undefined && run.steps > 0) {
       try {
         await appendLine($, await sessionFile($, 'outcomes'), {
-          type: 'outcome',
+          type: id === MAIN ? 'main-turn' : 'outcome',
           session: await $.session.id(),
-          agentId: e.agentId,
+          project: await projectName($),
+          ...(id === MAIN ? {} : { agentId: e.agentId }),
           key: run.key,
           subagentType: run.subagentType,
           model: run.model,
@@ -241,7 +282,7 @@ export const register: Register = on => {
         // Logging is best effort.
       }
 
-      runs.set(e.agentId as string, { ...run, steps: 0, input: 0, output: 0, cacheRead: 0, cacheWrite: 0 })
+      runs.set(id, { ...run, steps: 0, input: 0, output: 0, cacheRead: 0, cacheWrite: 0 })
     }
 
     return result

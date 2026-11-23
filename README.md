@@ -53,11 +53,16 @@ The router keeps a decision log you can tune the table from:
 2. **Outcomes.** When a subagent finishes, the add-on records its model, tokens, number of requests and time in `tuning/outcomes-<session>.jsonl`.
 3. **Ratings.** Under each finished subagent's row there are three buttons: **Right model**, **Needed stronger**, **Could be cheaper**. Your answer goes to `tuning/ratings-<session>.jsonl`.
 
+4. **Retries.** Sessions are told to re-run a subagent that ran on Sonnet or Haiku once on Opus when it fails a check they can see (tests, build, a plainly wrong result). The hook logs that second call as a retry, and the report counts it as "needed stronger" without you rating anything; the retry's cost is charged to the first choice.
+5. **The main session.** The add-on also logs each main-session turn (model, tokens, time), so a session's whole cost shows, not only its subagents'. Each line names its session and project folder, and decision lines carry the Agent call's short title.
+
 Then run:
 
 ```
-node report.mjs            # everything so far
-node report.mjs --days 7   # the last week
+node report.mjs                         # everything so far
+node report.mjs --days 7                # the last week
+node report.mjs --project MagmaStudio   # one project folder, with a per-session breakdown
+node recent.mjs 30 --project MagmaStudio
 ```
 
 It shows one row per cell of the routing table: how many tasks it got, the average estimated cost and time, how you rated them, and a suggestion. Once a cell has 3 ratings, it suggests **raise one step** when a third say "needed stronger", and **lower one step** when half say "could be cheaper". Change the cell in `ROUTES` in [router.mjs](router.mjs) and keep rating.

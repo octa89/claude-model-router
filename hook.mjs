@@ -14,10 +14,10 @@
 // Turn it off for one session or project by setting ROUTER_DISABLE=1.
 
 import { execFileSync } from 'node:child_process';
-import { appendFile } from 'node:fs/promises';
+import { appendFile, readFile } from 'node:fs/promises';
 import { basename, dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { FABLE_SUBAGENT_TYPES, route } from './router.mjs';
+import { EFFORTS, FABLE_SUBAGENT_TYPES, MODELS, route } from './router.mjs';
 
 const LOG = join(dirname(fileURLToPath(import.meta.url)), 'router.log');
 const SUBAGENT_TOOLS = ['Agent', 'Task'];
@@ -53,6 +53,32 @@ export function briefKey(text) {
     hash = Math.imul(hash, 0x01000193);
   }
   return (hash >>> 0).toString(16).padStart(8, '0');
+}
+
+// The effort for a model the session picked itself, without an effort.
+const DEFAULT_EFFORT = { haiku: 'low', sonnet: 'medium', opus: 'medium', fable: 'high' };
+const familyOf = (model) => Object.keys(MODELS).find((name) => String(model).toLowerCase().includes(name)) ?? null;
+
+/** The router's last decision for the same brief, if the log has one. */
+async function previousDecision(file, key) {
+  if (!file) return null;
+  let text = '';
+  try {
+    text = await readFile(file, 'utf8');
+  } catch {
+    return null;
+  }
+  const lines = text.trimEnd().split('\n');
+  for (let i = lines.length - 1; i >= 0; i -= 1) {
+    if (!lines[i].includes(key)) continue;
+    try {
+      const d = JSON.parse(lines[i]);
+      if (d.key === key && typeof d.model === 'string') return d;
+    } catch {
+      // A cut line: skip it.
+    }
+  }
+  return null;
 }
 
 async function log(file, entry) {
@@ -91,16 +117,39 @@ export async function handle(event, { logFile = LOG, ...routeOpts } = {}) {
     ...routeOpts,
   });
   const model = input.model || choice.model;
-  const effort = input.effort || choice.effort;
+  const pickedFamily = familyOf(input.model);
+  // A model the session picked, without an effort: the higher of the router's
+  // effort and that model's own starting effort, so a retry on Opus of a task
+  // rated easy still gets medium, and a task rated hard keeps its high.
+  const higher = (a, b) => (EFFORTS.indexOf(a) >= EFFORTS.indexOf(b) ? a : b);
+  const effort =
+    input.effort ||
+    (pickedFamily && pickedFamily !== choice.model ? higher(choice.effort, DEFAULT_EFFORT[pickedFamily]) : choice.effort);
+
+  // The same brief again on a stronger model: a retry after a failure. The
+  // tuning report counts these as "needed a stronger model".
+  const key = briefKey(input.prompt);
+  const earlier = await previousDecision(logFile, key);
+  const earlierFamily = familyOf(earlier?.model);
+  const finalFamily = familyOf(model);
+  const retryOf =
+    earlierFamily && finalFamily && MODELS[finalFamily].rank > MODELS[earlierFamily].rank
+      ? `${earlier.model} ${earlier.effort}`
+      : null;
 
   await log(logFile, {
     // Which session and project folder started the subagent.
     session: typeof event.session_id === 'string' ? event.session_id : null,
     project: typeof event.cwd === 'string' ? basename(event.cwd) || event.cwd : null,
-    key: briefKey(input.prompt),
+    key,
     subagentType: input.subagent_type ?? null,
+    // The Agent call's own short title (3-5 words), to judge the choice later.
+    // The brief itself is never logged.
+    description: typeof input.description === 'string' ? input.description.slice(0, 80) : null,
     model,
     effort,
+    ...(input.model ? { modelPickedBySession: true } : {}),
+    ...(retryOf ? { retryOf } : {}),
     source: choice.source,
     category: choice.category,
     difficulty: choice.difficulty,
