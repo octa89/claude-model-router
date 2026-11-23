@@ -1,0 +1,9 @@
+# The router's decision log: session ids and project folder names.
+router.log
+*.log
+
+# Written by Claude Code when it loads the mod.
+status-mod/.claude-plugin/types/
+
+node_modules/
+.DS_Store
