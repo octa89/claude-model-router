@@ -1,13 +1,49 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 
-import type { Labels } from '../types'
+import type { Labels, Rating, Ratings } from '../types'
 
 // The router's hook writes router.log next to hook.mjs, one folder above this
 // mod. So the mod must be installed from that folder (a directory
 // marketplace), as install.mjs does.
 function logPath($: EngineInterface): string {
   return `${$.plugin.root}/../router.log`
+}
+
+// Outcomes and ratings go in one file per session, next to the router's log,
+// so sessions running at the same time never write the same file.
+async function sessionFile($: EngineInterface, kind: 'outcomes' | 'ratings'): Promise<string> {
+  return `${$.plugin.root}/../tuning/${kind}-${await $.session.id()}.jsonl`
+}
+
+async function appendLine($: EngineInterface, path: string, entry: object): Promise<void> {
+  let text = ''
+
+  try {
+    text = await $.fs.read(path)
+  } catch {
+    // A new file.
+  }
+
+  await $.fs.write(path, `${text}${JSON.stringify({ time: new Date().toISOString(), ...entry })}\n`)
+}
+
+const RATING_TEXT: Record<Rating, string> = {
+  right: 'right model',
+  stronger: 'needed a stronger model',
+  cheaper: 'a cheaper model would do',
+}
+
+// What one subagent has used so far, for its outcome line.
+type Run = {
+  key: string
+  subagentType: string
+  model: string
+  steps: number
+  input: number
+  output: number
+  cacheRead: number
+  cacheWrite: number
 }
 const TAIL_BYTES = 32768
 const NOTHING_YET = 'no subagent yet'
@@ -16,6 +52,8 @@ const RISK_THRESHOLD = 0.4
 // What the router decided, by the key of the subagent brief it judged.
 // Rewritten whole from the log at each refresh, so it needs no shape tag.
 const labels = atom({ plugin: 'router-status', key: 'labels' } as const, {})
+// Ratings given in this session, so a rated row shows its rating.
+const ratings = atom({ plugin: 'router-status', key: 'ratings' } as const, {} as Ratings)
 
 /**
  * The key the router logs for a brief: 32-bit FNV-1a of its text, in hex.
@@ -113,13 +151,78 @@ export const register: Register = on => {
     return next(e)
   })
 
-  // The main session plans on Fable 5.2; once plan mode ends it is back on its own model.
-  on('turn.step', async function* ($, e, next) {
-    if (e.agentId === undefined && isPlanning && !isFable(e.model)) {
-      return yield* next({ ...e, model: PLAN_MODEL })
+  // Subagents being tracked for their outcome line, by agent id.
+  const runs = new Map<string, Run>()
+
+  // Remember which brief each subagent was started with, to join its outcome
+  // to the router's decision.
+  on('agent.spawn', async ($, e, next) => {
+    const started = await next(e)
+
+    if (started.agentId !== undefined) {
+      runs.set(started.agentId, {
+        key: briefKey(e.prompt),
+        subagentType: e.subagentType,
+        model: started.model,
+        steps: 0,
+        input: 0,
+        output: 0,
+        cacheRead: 0,
+        cacheWrite: 0,
+      })
     }
 
-    return yield* next(e)
+    return started
+    // This mod only watches. If it fails, the subagent starts untouched.
+  }).catch(($, e, next) => next(e))
+
+  // Each model request: the main session plans on Fable 5.2 while plan mode
+  // is on, and a tracked subagent's tokens are added up.
+  on('turn.step', async function* ($, e, next) {
+    const step = e.agentId === undefined && isPlanning && !isFable(e.model) ? { ...e, model: PLAN_MODEL } : e
+    const result = yield* next(step)
+    const run = e.agentId === undefined ? undefined : runs.get(e.agentId)
+
+    if (run !== undefined && result?.usage) {
+      run.steps += 1
+      run.model = result.usage.model
+      run.input += result.usage.input_tokens
+      run.output += result.usage.output_tokens
+      run.cacheRead += result.usage.cache_read_input_tokens
+      run.cacheWrite += result.usage.cache_creation_input_tokens
+    }
+
+    return result
+  })
+
+  // A subagent's turn ended: write its outcome line, then count afresh for a
+  // later turn of the same subagent.
+  on('turn.complete', async ($, e, next) => {
+    const result = await next(e)
+    const run = e.agentId === undefined ? undefined : runs.get(e.agentId)
+
+    if (run !== undefined) {
+      try {
+        await appendLine($, await sessionFile($, 'outcomes'), {
+          type: 'outcome',
+          session: await $.session.id(),
+          agentId: e.agentId,
+          key: run.key,
+          subagentType: run.subagentType,
+          model: run.model,
+          reason: e.reason,
+          durationMs: e.durationMs,
+          steps: run.steps,
+          tokens: { input: run.input, output: run.output, cacheRead: run.cacheRead, cacheWrite: run.cacheWrite },
+        })
+      } catch {
+        // Logging is best effort.
+      }
+
+      runs.set(e.agentId as string, { ...run, steps: 0, input: 0, output: 0, cacheRead: 0, cacheWrite: 0 })
+    }
+
+    return result
   })
 
   on('session.start', async ($, e, next) => {
@@ -165,18 +268,43 @@ export const register: Register = on => {
 
     const input = e.props.input as { prompt?: unknown } | null
     const prompt = typeof input?.prompt === 'string' ? input.prompt : ''
-    const label = (await read($, labels))[briefKey(prompt)]
+    const key = briefKey(prompt)
+    const label = (await read($, labels))[key]
 
     if (label === undefined) {
       return next(e)
     }
 
-    const { Box, Text } = $.ui.resolve(e)
+    const { Box, Button, Text } = $.ui.resolve(e)
+    const rated = (await read($, ratings))[key]
+
+    const rate = async (rating: Rating) => {
+      await update($, ratings, r => ({ ...r, [key]: rating }))
+      await appendLine($, await sessionFile($, 'ratings'), {
+        type: 'rating',
+        session: await $.session.id(),
+        key,
+        rating,
+      })
+    }
+
+    // Rate once the subagent has finished; a running or failed one is not rated.
+    const isRateable = !e.props.isRunning && !e.props.isErrored && !e.props.isInterrupted
 
     return (
       <Box flexDirection="column">
         {await next(e)}
         <Text dimColor>Model router: {label}</Text>
+        {rated !== undefined ? (
+          <Text dimColor>Your rating: {RATING_TEXT[rated]}</Text>
+        ) : isRateable ? (
+          <Box flexDirection="row">
+            <Text dimColor>Rate this choice: </Text>
+            <Button key="right" label="Right model" onPress={() => rate('right')} />
+            <Button key="stronger" label="Needed stronger" onPress={() => rate('stronger')} />
+            <Button key="cheaper" label="Could be cheaper" onPress={() => rate('cheaper')} />
+          </Box>
+        ) : null}
       </Box>
     )
   })

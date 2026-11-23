@@ -45,6 +45,25 @@ The `router-status` add-on for Claude Code shows the router's choices:
 - **Under each subagent's row:** `Model router: Sonnet · low effort · search_read, easy, 86% sure`.
 - **Plan mode:** while the main session is in plan mode, its requests go to Fable 5.2 and the status line starts with `Plan mode: Fable`. When plan mode ends, the session goes back to its own model.
 
+## Tuning the table
+
+The router keeps a decision log you can tune the table from:
+
+1. **Decisions.** `router.log` holds what the router chose for each subagent, and why.
+2. **Outcomes.** When a subagent finishes, the add-on records its model, tokens, number of requests and time in `tuning/outcomes-<session>.jsonl`.
+3. **Ratings.** Under each finished subagent's row there are three buttons: **Right model**, **Needed stronger**, **Could be cheaper**. Your answer goes to `tuning/ratings-<session>.jsonl`.
+
+Then run:
+
+```
+node report.mjs            # everything so far
+node report.mjs --days 7   # the last week
+```
+
+It shows one row per cell of the routing table: how many tasks it got, the average estimated cost and time, how you rated them, and a suggestion. Once a cell has 3 ratings, it suggests **raise one step** when a third say "needed stronger", and **lower one step** when half say "could be cheaper". Change the cell in `ROUTES` in [router.mjs](router.mjs) and keep rating.
+
+Costs are estimates from token counts and the list prices in `report.mjs`. The brief's text is never stored. Both files stay on your machine and are ignored by git.
+
 ## Install
 
 Needs Claude Code, Node 20 or newer, and an [OpenRouter](https://openrouter.ai) API key. Tested on Windows.
@@ -108,6 +127,7 @@ Settings, all optional, as environment variables:
 | `status-mod/` | The `router-status` add-on: status line, row labels, plan-mode switch. |
 | `install.mjs` | Installer and uninstaller. |
 | `recent.mjs` | Prints the latest decisions. |
+| `report.mjs` | Tuning report: cost, time and ratings per routing-table cell. |
 | `scenarios.mjs` | Runs sample tasks through the live router. |
 | `set-key.ps1` | Saves your OpenRouter key on Windows and runs a live test. |
 | `*.test.mjs` | Tests. |

@@ -73,7 +73,20 @@ export function updateSettings(settings, { hookPath = HOOK, remove = false } = {
 function claude(...cliArgs) {
   console.log(`> claude ${cliArgs.join(' ')}`);
   if (isDryRun) return true;
-  const run = spawnSync('claude', cliArgs, { stdio: 'inherit', shell: process.platform === 'win32' });
+  let run = spawnSync('claude', cliArgs, { stdio: 'inherit' });
+  // An npm-installed claude on Windows is a .cmd shim, which needs a shell.
+  if (run.error && process.platform === 'win32') {
+    const quoted = cliArgs.map((a) => `"${a.replace(/"/g, '\\"')}"`).join(' ');
+    run = spawnSync(`claude ${quoted}`, { stdio: 'inherit', shell: true });
+  }
+  return run.status === 0;
+}
+
+/** Whether an OpenRouter key is saved: in this environment, or on Windows in the user's saved variables. */
+function hasSavedKey() {
+  if (process.env.OPENROUTER_API_KEY) return true;
+  if (process.platform !== 'win32') return false;
+  const run = spawnSync('reg', ['query', 'HKCU\\Environment', '/v', 'OPENROUTER_API_KEY'], { stdio: 'ignore' });
   return run.status === 0;
 }
 
@@ -107,9 +120,8 @@ function main() {
     console.log('\nThe status mod did not install. The router still works; see the README to install the mod by hand.');
   }
 
-  const hasKey = Boolean(process.env.OPENROUTER_API_KEY);
   console.log('\nDone. Start a new Claude Code session to use it.');
-  if (!hasKey) {
+  if (!hasSavedKey()) {
     console.log('Next: save your OpenRouter key as the OPENROUTER_API_KEY environment variable');
     console.log(process.platform === 'win32' ? '  (on Windows: run set-key.ps1 in this folder).' : '  (for example in your shell profile).');
   }
