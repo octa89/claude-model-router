@@ -48,6 +48,42 @@
       "kind": "review_verify / normal",
       "prompt": "Review src/refund.js for bugs. Do not change any file. Reply with exactly one line: LINE=<line number of the most serious bug>, then one sentence saying what is wrong.",
       "check": { "answer": "LINE=(5|6)\\b" }
+    },
+    {
+      "id": "h1-expr",
+      "kind": "coding_hard / hard",
+      "prompt": "Implement evaluate in src/expr.js exactly as its doc comment specifies, including every error message.",
+      "check": { "tests": "expr.check.js" }
+    },
+    {
+      "id": "h2-lru",
+      "kind": "coding_hard / normal",
+      "prompt": "Users report that the cache in src/lru.js sometimes returns entries that should have been evicted, and that its size is wrong. Fix it so it matches its doc comment.",
+      "check": { "tests": "lru.check.js" }
+    },
+    {
+      "id": "h3-csv",
+      "kind": "coding_hard / normal",
+      "prompt": "Implement parseCsv in src/csv.js as its doc comment describes.",
+      "check": { "tests": "csv.check.js" }
+    },
+    {
+      "id": "h4-dates",
+      "kind": "coding_routine / normal",
+      "prompt": "Implement addBusinessDays in src/dates.js as its doc comment describes.",
+      "check": { "tests": "dates.check.js" }
+    },
+    {
+      "id": "h5-semver",
+      "kind": "coding_hard / hard",
+      "prompt": "Implement satisfies in src/semver.js. Follow its doc comment exactly; it covers every form of range you need to handle.",
+      "check": { "tests": "semver.check.js" }
+    },
+    {
+      "id": "h6-money",
+      "kind": "coding_hard / normal",
+      "prompt": "Implement allocate in src/money.js exactly as its doc comment describes.",
+      "check": { "tests": "money.check.js" }
     }
   ]
 }
