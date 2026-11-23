@@ -61,31 +61,42 @@ export const DIFFICULTIES = Object.keys(DIFFICULTY_CRITERIA);
 
 // category -> [easy, normal, hard] as "model:effort".
 //
-// Policy: Sonnet 5.5 does every task it can handle well; Opus 5.5 only takes
-// the hard ones; Fable 5.2 plans, designs and reviews.
-//   - Planning and design (orchestration, deep_reasoning) and every review run
-//     on Fable, at medium for easy work (the Fable guide: plan at medium) and
-//     high otherwise.
-//   - Execution (coding, research, long unattended builds) runs on Sonnet
-//     5.5 up to normal difficulty, at high effort for normal coding and long
-//     work so it does not stop early. Only hard execution goes to Opus 5.5.
-//     Builds are reviewed afterwards, and a failed subagent is retried once on
-//     Opus, so a weak first pass is caught.
-//   - Sonnet starts at low for chat, extraction and search.
-//   - xhigh and max are never chosen here: the docs reserve them for a
-//     measured gain. Escalation after a failure can still reach Fable.
+// Roles (the owner's design, checked against Anthropic's model guides):
+//   - Opus 5.5 is the coordinator. The main session runs on it, and so do
+//     planning, orchestration and every review: the Opus 5.5 guide names code
+//     review and multistep work in a real repository as its biggest gains,
+//     and its medium effort beats Claude Opus 5 at high.
+//   - Sonnet 5.5 takes the small and everyday jobs: low for chat, extraction
+//     and search (its guide's starting point), medium for agentic coding (at
+//     low it can skip verifying a change), high for normal long builds.
+//   - Fable 5.2 is the deep worker: hard coding, hard research, design and
+//     hard long unattended runs, at high (its guide: high for hard coding,
+//     research and long unattended runs). Normal deep reasoning runs at
+//     medium, with a "finish the whole task" note added to the brief, since
+//     it stops early more often below high.
+//   - xhigh and max are never chosen here: the guides reserve them for a
+//     measured gain.
 export const ROUTES = {
   classify_extract: ['sonnet:low', 'sonnet:low', 'sonnet:medium'],
   chat_simple: ['sonnet:low', 'sonnet:low', 'sonnet:medium'],
   search_read: ['sonnet:low', 'sonnet:low', 'sonnet:medium'],
   coding_routine: ['sonnet:medium', 'sonnet:medium', 'sonnet:high'],
-  coding_hard: ['sonnet:high', 'sonnet:high', 'opus:high'],
-  knowledge_research: ['sonnet:medium', 'sonnet:high', 'opus:high'],
-  long_autonomous: ['sonnet:medium', 'sonnet:high', 'opus:high'],
+  coding_hard: ['sonnet:high', 'fable:medium', 'fable:high'],
+  knowledge_research: ['sonnet:medium', 'sonnet:high', 'fable:high'],
+  long_autonomous: ['sonnet:medium', 'sonnet:high', 'fable:high'],
   deep_reasoning: ['fable:medium', 'fable:high', 'fable:high'],
-  orchestration: ['fable:medium', 'fable:medium', 'fable:high'],
-  review_verify: ['fable:medium', 'fable:high', 'fable:high'],
+  orchestration: ['opus:medium', 'opus:medium', 'opus:high'],
+  review_verify: ['opus:medium', 'opus:high', 'opus:high'],
 };
+
+// Added to a Fable brief below high effort. From the Fable 5.2 guide, section
+// "Finish the whole task": below high it ends turns early more often.
+export const FINISH_NOTE = [
+  '',
+  '',
+  '# Finishing work',
+  'Please avoid stopping while you still owe work the user asked for. Be persistent and do not stop unless needed. Carry on with work that does not depend on an answer without unnecessary stops. You may meet ordinary obstacles like errors, timeouts, locked files, empty results or failing tools: diagnose them and work through them with the access you have rather than stopping. Leave deliberate blockers alone and report them.',
+].join(String.fromCharCode(10));
 
 // Subagent types whose work is fixed and read-only, or only relays another
 // model's work (codex-rescue runs the Codex CLI). They skip the classifier:
@@ -99,8 +110,9 @@ export const TYPE_ROUTES = {
   'codex:codex-rescue': 'sonnet:low',
 };
 
-// Subagent types that always plan or review, whatever Bison says: Fable at least.
-export const FABLE_SUBAGENT_TYPES = /^(plan|planner)$|review|verif|audit/i;
+// Subagent types that always plan or review, whatever Bison says: the
+// coordinator's work, so always Opus.
+export const COORDINATOR_SUBAGENT_TYPES = /^(plan|planner)$|review|verif|audit/i;
 
 // Used only when Haiku is allowed in the pool.
 const HAIKU_ROUTES = {
@@ -108,7 +120,7 @@ const HAIKU_ROUTES = {
 };
 
 // When the classifier is unsure: Sonnet at high. A failed subagent is retried
-// once on Opus, which is cheaper overall than starting every unsure task there.
+// once on Opus (the coordinator's rule), cheaper overall than starting there.
 export const FALLBACK = { model: 'sonnet', effort: 'high' };
 // Below this probability for the chosen category, the safe default is used.
 export const MIN_CONFIDENCE = 0.5;

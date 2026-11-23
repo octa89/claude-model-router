@@ -1,6 +1,8 @@
 # claude-model-router
 
-Picks a Claude model and effort level for each subagent that Claude Code starts, so routine work runs on a cheaper model and planning, hard work and reviews get a stronger one.
+Picks a Claude model and effort level for each subagent that Claude Code starts. The main session is the coordinator on Opus 5.5; small jobs go to Sonnet 5.5, deep work to Fable 5.2, and planning and reviews stay on Opus.
+
+The routing runs inside the `router-status` mod, at the moment a subagent starts (its `agent.spawn` hook sets the model and brief, its `turn.step` hook sets the effort of each of the subagent's requests). It does not use a PreToolUse hook: a hook that rewrites the Agent call makes auto mode send the call back once. Only subagents started with the Agent tool are routed; a separate session runs on your default model, so sessions are told to run builds as subagents.
 
 A small decision model, **Bison 1** (`baseten/bison-1`, through [OpenRouter's Decisions API](https://openrouter.ai/baseten/bison-1)), reads each subagent's brief and answers three typed questions in about a third of a second:
 
@@ -12,7 +14,7 @@ Fixed rules then turn those answers into a model and an effort level. The rules 
 
 ## Policy
 
-**Sonnet 5.5 does every task it can handle well; Opus 5.5 takes only hard execution work; Fable 5.2 plans, designs and reviews.**
+**Opus 5.5 coordinates (main session, planning, reviews); Sonnet 5.5 does the small and everyday jobs; Fable 5.2 does the deep work.** Effort levels follow each model's guide: Sonnet low for chat and search and medium for coding; Opus medium (its default, which beats Opus 5 at high); Fable high for hard work.
 
 | Task | Easy | Normal | Hard |
 |---|---|---|---|
@@ -20,19 +22,21 @@ Fixed rules then turn those answers into a model and an effort level. The rules 
 | Simple chat | Sonnet low | Sonnet low | Sonnet medium |
 | Search and read | Sonnet low | Sonnet low | Sonnet medium |
 | Routine coding | Sonnet medium | Sonnet medium | Sonnet high |
-| Hard coding | Sonnet high | Sonnet high | Opus high |
-| Research and analysis | Sonnet medium | Sonnet high | Opus high |
-| Long unattended work | Sonnet medium | Sonnet high | Opus high |
-| Deep reasoning, design (planning) | Fable medium | Fable high | Fable high |
-| Orchestrating other agents (planning) | Fable medium | Fable medium | Fable high |
-| Review and verification | Fable medium | Fable high | Fable high |
+| Hard coding | Sonnet high | Fable medium | Fable high |
+| Research and analysis | Sonnet medium | Sonnet high | Fable high |
+| Long unattended work | Sonnet medium | Sonnet high | Fable high |
+| Deep reasoning, design | Fable medium | Fable high | Fable high |
+| Orchestrating other agents | Opus medium | Opus medium | Opus high |
+| Review and verification | Opus medium | Opus high | Opus high |
+
+A Fable brief below high effort gets a short "finish the whole task" section added: the Fable 5.2 guide says it stops early more often at low and medium.
 
 Safety nets:
 
 - **Unsure or unavailable classifier.** If Bison fails, no key is set, or the chosen category has a probability under 0.5, the subagent gets Sonnet at high; if it fails, it is retried once on Opus. Subagents are never blocked.
 - **Risky work.** A risk probability of 0.4 or more means at least Opus at medium.
 - **Fixed routes by type.** `Explore`, `web-fetch`, `claude-code-guide`, `statusline-setup`, `caveman:cavecrew-investigator` and `codex:codex-rescue` always get Sonnet at low, without asking the classifier: they only read, or relay Codex's work.
-- **Fixed subagent types.** Subagents of type `Plan`, and any type with "review", "verif" or "audit" in its name, always get Fable.
+- **Fixed subagent types.** Subagents of type `Plan`, and any type with "review", "verif" or "audit" in its name, always get Opus, the coordinator.
 - **The session's own choice wins.** A model and effort the session already set for a subagent are left alone.
 - **Effort ceiling.** `xhigh` and `max` are never chosen by the rules.
 
@@ -44,7 +48,6 @@ The `router-status` add-on for Claude Code shows the router's choices:
 
 - **Status line** under the prompt box: the last choice, such as `Sonnet · low effort`.
 - **Under each subagent's row:** `Model router: Sonnet · low effort · search_read, easy, 86% sure`.
-- **Plan mode:** while the main session is in plan mode, its requests go to Fable 5.2 and the status line starts with `Plan mode: Fable`. When plan mode ends, the session goes back to its own model.
 
 ## Tuning the table
 
@@ -101,7 +104,7 @@ It reports pass rate, cost per solved task and time for each setup, and the rout
 
 Needs Claude Code, Node 20 or newer, and an [OpenRouter](https://openrouter.ai) API key. Tested on Windows.
 
-1. Clone the repository somewhere it can stay. The hook runs from this folder and writes its log here.
+1. Clone the repository somewhere it can stay. The mod runs the router (hook.mjs) from this folder and writes its log here.
 
    ```
    git clone https://github.com/octa89/claude-model-router.git
@@ -158,7 +161,7 @@ Settings, all optional, as environment variables:
 | File | What it is |
 |---|---|
 | `router.mjs` | The classifier call and the routing rules. Also a command-line tool. |
-| `hook.mjs` | The Claude Code `PreToolUse` hook that routes each subagent. |
+| `hook.mjs` | The router the mod runs before each subagent starts (it reads a PreToolUse-shaped event on stdin and prints the choice). |
 | `status-mod/` | The `router-status` add-on: status line, row labels, plan-mode switch. |
 | `install.mjs` | Installer and uninstaller. |
 | `recent.mjs` | Prints the latest decisions. |

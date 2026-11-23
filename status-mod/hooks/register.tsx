@@ -3,11 +3,14 @@ import type { EngineInterface, Register } from 'claude-code'
 
 import type { AgentKeys, Labels, Rating, Ratings } from '../types'
 
-// The router's hook writes router.log next to hook.mjs, one folder above this
-// mod. So the mod must be installed from that folder (a directory
+// The router (hook.mjs) sits one folder above this mod and writes router.log
+// there. So the mod must be installed from that folder (a directory
 // marketplace), as install.mjs does.
 function logPath($: EngineInterface): string {
   return `${$.plugin.root}/../router.log`
+}
+function routerPath($: EngineInterface): string {
+  return `${$.plugin.root}/../hook.mjs`
 }
 
 // Outcomes and ratings go in one file per session, next to the router's log,
@@ -25,12 +28,15 @@ async function projectName($: EngineInterface): Promise<string> {
   return cwd.split(/[\\/]/).filter(Boolean).pop() ?? cwd
 }
 
-// Standing instruction for the main session: one retry on Opus when a
-// subagent the router sent to a cheaper model fails a check. Measured: a
-// Sonnet run that failed passed on Opus; Anthropic found "run cheap, re-run
-// failures higher" holds the pass rate for about 40% less.
+// Standing instruction for a session that can start subagents. The main
+// session is the coordinator (Opus 5.5); the router gives each subagent its
+// model: Sonnet 5.5 for small jobs, Fable 5.2 for deep work, Opus for
+// planning and review. Measured: a Sonnet run that failed passed on Opus;
+// Anthropic found "run cheap, re-run failures higher" holds the pass rate for
+// about 40% less.
 const RETRY_RULE = [
-  'Model router: subagents are routed to a model and effort automatically.',
+  "Model router: you are the coordinator. Subagents are routed to a model and effort automatically (Sonnet 5.5 for small jobs, Fable 5.2 for deep work, Opus 5.5 for planning and review), so leave the Agent call's model and effort unset.",
+  'Run builds and other long tasks as subagents with the Agent tool (in their own worktree when they change code), not as separate sessions, so they are routed too.',
   'When a subagent that ran on Sonnet or Haiku fails a check you can see (tests or build fail, a checker rejects it, or its result is plainly wrong or incomplete), start it once more with the same brief and model "opus" on the Agent call. Retry once only; for a failure on Opus or Fable, handle it as you normally would.',
 ].join(' ')
 
@@ -146,40 +152,53 @@ export const parse = (tail: string, sessionId: string): { latest: string; byKey:
   return { latest, byKey }
 }
 
-// The main session's model while plan mode is on.
-const PLAN_MODEL = 'claude-fable-5-2'
-const isFable = (model: string): boolean => /fable/i.test(model)
+// What the router asked for, waiting to be tied to the subagent's own id.
+type Pending = { description: string; subagentType: string; effort: string }
 
-/** The status line: the last subagent choice, and Fable for the main session in plan mode. */
-export const statusLine = (isPlanning: boolean, lastSubagent: string): string =>
-  isPlanning ? `Plan mode: Fable · ${lastSubagent}` : lastSubagent
+/** What the router's reply asks for: model, effort and the brief to run. */
+export const readDecision = (
+  stdout: string,
+): { model: string; effort: string; prompt?: string } | null => {
+  try {
+    const input = JSON.parse(stdout)?.hookSpecificOutput?.updatedInput
+
+    if (typeof input?.model !== 'string' || typeof input?.effort !== 'string') {
+      return null
+    }
+
+    return {
+      model: input.model,
+      effort: input.effort,
+      ...(typeof input.prompt === 'string' ? { prompt: input.prompt } : {}),
+    }
+  } catch {
+    return null
+  }
+}
+
+const capital = (word: string): string => word.charAt(0).toUpperCase() + word.slice(1)
+
+/**
+ * Reads the end of the router's log into the labels under each subagent row,
+ * and answers the latest choice made for this session.
+ */
+async function refreshLabels($: EngineInterface): Promise<string> {
+  const { size } = await $.fs.stat(logPath($))
+  const offset = Math.max(0, size - TAIL_BYTES)
+  const tail = await $.fs.read(logPath($), { offset, length: TAIL_BYTES })
+  const { latest, byKey } = parse(tail, await $.session.id())
+  await update($, labels, () => byKey)
+  return latest
+}
 
 export const register: Register = on => {
-  // Whether the main session is in plan mode, as the engine's plan-mode
-  // reminders say. Starts off; a reload resets it until the next reminder.
-  let isPlanning = false
-  // The last subagent choice, so the status line can go back to it.
+  // The last subagent choice, for the status line.
   let lastSubagent = NOTHING_YET
+  // The effort the router chose, by subagent id, and choices whose subagent
+  // has no id yet (its first request can come before the spawn answers).
+  const efforts = new Map<string, string>()
+  const pending: Pending[] = []
 
-  // While plan mode is on, each request of the main session carries one of these.
-  on('prompt.attachment', { type: ['plan_mode', 'plan_mode_reentry'] }, ($, e, next) => {
-    if (e.agentId === undefined && !isPlanning) {
-      isPlanning = true
-      $.ui.status(statusLine(isPlanning, lastSubagent))
-    }
-
-    return next(e)
-  })
-
-  // Made once when plan mode ends.
-  on('prompt.attachment', { type: 'plan_mode_exit' }, ($, e, next) => {
-    if (e.agentId === undefined && isPlanning) {
-      isPlanning = false
-      $.ui.status(statusLine(isPlanning, lastSubagent))
-    }
-
-    return next(e)
-  })
 
   // Turns being tracked for their outcome line: subagents by agent id, and
   // the main session as MAIN.
@@ -200,9 +219,60 @@ export const register: Register = on => {
 
   // Remember which brief each subagent was started with, to join its outcome
   // to the router's decision.
+  // The router: before a subagent starts, ask hook.mjs (classifier and
+  // rules) for its model, effort and brief. Done here rather than in a
+  // PreToolUse hook, so the Agent call reaches auto mode unchanged and is
+  // never sent back. Forks, resumed subagents and workflow agents keep
+  // what they have.
   on('agent.spawn', async ($, e, next) => {
-    const started = await next(e)
+    let spawn = e
+    let entry: Pending | null = null
+
+    if (!e.fork && e.resume === undefined && e.workflow === undefined) {
+      try {
+        const event = {
+          hook_event_name: 'PreToolUse',
+          tool_name: 'Agent',
+          session_id: await $.session.id().catch(() => null),
+          cwd: e.cwd ?? (await $.session.cwd().catch(() => null)),
+          tool_input: {
+            prompt: e.prompt,
+            description: e.description,
+            subagent_type: e.subagentType,
+            ...(e.model !== undefined ? { model: e.model } : {}),
+          },
+        }
+        const { exitCode, stdout } = await $.process.run(['node', routerPath($)], {
+          stdin: JSON.stringify(event),
+          timeoutMs: 15000,
+        })
+        const decision = exitCode === 0 ? readDecision(stdout) : null
+
+        if (decision !== null) {
+          spawn = { ...e, model: decision.model, prompt: decision.prompt ?? e.prompt }
+          entry = { description: e.description, subagentType: e.subagentType, effort: decision.effort }
+          pending.push(entry)
+          try {
+            lastSubagent = await refreshLabels($)
+          } catch {
+            // No log yet.
+          }
+          lastSubagent = `${capital(decision.model)} · ${decision.effort} effort`
+          $.ui.status(lastSubagent)
+        }
+      } catch {
+        // No router answer: the subagent starts as asked.
+      }
+    }
+
+    const started = await next(spawn)
     const agentId = started.agentId
+
+    if (entry !== null) {
+      const at = pending.indexOf(entry)
+      if (at >= 0) pending.splice(at, 1)
+      if (agentId !== undefined) efforts.set(agentId, entry.effort)
+    }
 
     if (agentId !== undefined) {
       // A message sent to a running subagent starts it again with that
@@ -230,10 +300,25 @@ export const register: Register = on => {
     // This mod only watches. If it fails, the subagent starts untouched.
   }).catch(($, e, next) => next(e))
 
-  // Each model request: the main session plans on Fable 5.2 while plan mode
-  // is on, and a tracked subagent's tokens are added up.
+  // Each model request: a routed subagent runs at the router's effort, and a
+  // tracked subagent's tokens are added up.
   on('turn.step', async function* ($, e, next) {
-    const step = e.agentId === undefined && isPlanning && !isFable(e.model) ? { ...e, model: PLAN_MODEL } : e
+    let effort = e.agentId !== undefined ? efforts.get(e.agentId) : undefined
+
+    if (e.agentId !== undefined && effort === undefined && pending.length > 0) {
+      const info = (await $.agent.list()).find(a => a.id === e.agentId)
+      const at = pending.findIndex(p => p.description === info?.description && p.subagentType === info?.type)
+
+      const found = pending[at]
+
+      if (found !== undefined) {
+        effort = found.effort
+        efforts.set(e.agentId, effort)
+        pending.splice(at, 1)
+      }
+    }
+
+    const step = effort !== undefined && e.effort !== effort ? { ...e, effort: effort as typeof e.effort } : e
     const result = yield* next(step)
     const id = e.agentId ?? MAIN
 
@@ -290,17 +375,12 @@ export const register: Register = on => {
 
   on('session.start', async ($, e, next) => {
     try {
-      const { size } = await $.fs.stat(logPath($))
-      const offset = Math.max(0, size - TAIL_BYTES)
-      const tail = await $.fs.read(logPath($), { offset, length: TAIL_BYTES })
-      const { latest, byKey } = parse(tail, await $.session.id())
-      lastSubagent = latest
-      await update($, labels, () => byKey)
+      lastSubagent = await refreshLabels($)
     } catch {
       lastSubagent = NOTHING_YET
     }
 
-    $.ui.status(statusLine(isPlanning, lastSubagent))
+    $.ui.status(lastSubagent)
 
     return next(e)
   })
@@ -310,13 +390,8 @@ export const register: Register = on => {
     const ran = await next(e)
 
     try {
-      const { size } = await $.fs.stat(logPath($))
-      const offset = Math.max(0, size - TAIL_BYTES)
-      const tail = await $.fs.read(logPath($), { offset, length: TAIL_BYTES })
-      const { latest, byKey } = parse(tail, await $.session.id())
-      lastSubagent = latest
-      await update($, labels, () => byKey)
-      $.ui.status(statusLine(isPlanning, lastSubagent))
+      lastSubagent = await refreshLabels($)
+      $.ui.status(lastSubagent)
     } catch {
       // No log yet: keep what is shown.
     }

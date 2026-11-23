@@ -1,8 +1,10 @@
 #!/usr/bin/env node
 // Installs the model router into Claude Code for your user, from this folder:
-//   1. adds the router's PreToolUse hook to your Claude Code user settings
-//      (a backup of the file is saved next to it first), and
-//   2. installs the router-status mod from ./status-mod.
+//   1. installs the router-status mod from ./status-mod, which routes each
+//      subagent (it runs hook.mjs from this folder before a subagent starts),
+//   2. removes the PreToolUse hook earlier versions added to your user
+//      settings (a backup of the file is saved next to it first): a hook that
+//      rewrites the Agent call makes auto mode send the call back.
 //
 // Usage:
 //   node install.mjs              install, or point an earlier install here
@@ -92,9 +94,13 @@ function hasSavedKey() {
 
 function main() {
   const settings = existsSync(SETTINGS) ? JSON.parse(readFileSync(SETTINGS, 'utf8')) : {};
-  const updated = updateSettings(settings, { remove: isUninstall });
+  // The mod routes now; an earlier install's hook is always taken out.
+  const updated = updateSettings(settings, { remove: true });
+  const changed = JSON.stringify(updated) !== JSON.stringify(settings);
 
-  if (isDryRun) {
+  if (!changed) {
+    console.log(`No router hook in ${SETTINGS}: nothing to remove.`);
+  } else if (isDryRun) {
     console.log(`Would write ${SETTINGS}, PreToolUse becomes:`);
     console.log(JSON.stringify(updated.hooks?.PreToolUse ?? [], null, 2));
   } else {
@@ -104,7 +110,7 @@ function main() {
       console.log(`Backed up your settings to ${backup}`);
     }
     writeFileSync(SETTINGS, `${JSON.stringify(updated, null, 2)}\n`);
-    console.log(`${isUninstall ? 'Removed the router hook from' : 'Added the router hook to'} ${SETTINGS}`);
+    console.log(`Removed the old router hook from ${SETTINGS}`);
   }
 
   if (isUninstall) {

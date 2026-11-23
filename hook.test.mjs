@@ -106,11 +106,12 @@ test('the log line names the session and the project folder', async () => {
   assert.equal(line.prompt, undefined, 'the brief is not logged');
 });
 
-test('Plan and review subagent types always get Fable, even for an easy brief', async () => {
+test('Plan and review subagent types always get Opus, the coordinator, even for a deep brief', async () => {
   for (const subagent_type of ['Plan', 'code-reviewer', 'verifier']) {
     const out = await handle(event({ prompt: 'Look at this', subagent_type }), opts(fakeFetch(reply('search_read', 'easy'))));
-    assert.equal(out.hookSpecificOutput.updatedInput.model, 'fable', subagent_type);
-    assert.equal(out.hookSpecificOutput.updatedInput.effort, 'medium', subagent_type);
+    assert.equal(out.hookSpecificOutput.updatedInput.model, 'opus', subagent_type);
+    const deep = await handle(event({ prompt: 'Design it', subagent_type }), opts(fakeFetch(reply('deep_reasoning', 'hard'))));
+    assert.equal(deep.hookSpecificOutput.updatedInput.model, 'opus', subagent_type);
   }
   const explore = await handle(event({ prompt: 'Look at this', subagent_type: 'Explore' }), opts(fakeFetch(reply('search_read', 'easy'))));
   assert.equal(explore.hookSpecificOutput.updatedInput.model, 'sonnet');
@@ -152,4 +153,13 @@ test('read-only and relay subagent types use a fixed route without the classifie
     assert.match(out.systemMessage, new RegExp('fixed for ' + subagent_type));
   }
   assert.equal(called, false);
+});
+
+test('a Fable brief below high effort gets the finish-the-task note, once', async () => {
+  const out = await handle(event({ prompt: 'Fix the flaky sync bug', subagent_type: 'general-purpose' }), opts(fakeFetch(reply('coding_hard', 'normal'))));
+  const input = out.hookSpecificOutput.updatedInput;
+  assert.deepEqual([input.model, input.effort], ['fable', 'medium']);
+  assert.ok(input.prompt.startsWith('Fix the flaky sync bug\n\n# Finishing work\n'));
+  const high = await handle(event({ prompt: 'Fix it', subagent_type: 'general-purpose' }), opts(fakeFetch(reply('coding_hard', 'hard'))));
+  assert.equal(high.hookSpecificOutput.updatedInput.prompt, 'Fix it');
 });

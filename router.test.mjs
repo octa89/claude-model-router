@@ -77,7 +77,7 @@ test('a harder task never gets a weaker model', () => {
 test('documented starting points', () => {
   assert.deepEqual(pick(decide(label({ category: 'chat_simple' }))), ['sonnet', 'low']);
   assert.deepEqual(pick(decide(label({ category: 'coding_routine' }))), ['sonnet', 'medium']);
-  assert.deepEqual(pick(decide(label({ category: 'coding_hard' }))), ['sonnet', 'high']);
+  assert.deepEqual(pick(decide(label({ category: 'coding_hard' }))), ['fable', 'medium']);
   assert.deepEqual(pick(decide(label({ category: 'deep_reasoning' }))), ['fable', 'high']);
 });
 
@@ -187,7 +187,7 @@ test('escalation raises effort first, then the model, and ends', () => {
 test('route calls the Decisions API with Bison and uses its answer', async () => {
   const f = fakeFetch(decision({ category: 'review_verify', p: 0.95 }));
   const r = await route('Review this pull request', { apiKey: 'test-key', classifierModel: undefined, fetchImpl: f });
-  assert.deepEqual(pick(r), ['fable', 'high']);
+  assert.deepEqual(pick(r), ['opus', 'high']);
   assert.equal(r.source, 'classifier');
   assert.equal(r.classifierModel, 'baseten/bison-1');
   assert.equal(fakeFetch.last.url, 'https://openrouter.ai/api/alpha/decisions');
@@ -295,14 +295,20 @@ test('names every object inherits are not mistaken for models or categories', ()
   assert.throws(() => readDecision(decision({ category: 'constructor' })), /unknown category/);
 });
 
-test('policy: Fable plans and reviews; execution is Sonnet, Opus only when hard', () => {
-  const planning = ['orchestration', 'deep_reasoning', 'review_verify'];
+test('policy: Opus coordinates, Sonnet does small jobs, Fable does deep work', () => {
+  const coordinating = ['orchestration', 'review_verify'];
+  const small = ['classify_extract', 'chat_simple', 'search_read', 'coding_routine'];
+  const deep = ['coding_hard', 'knowledge_research', 'long_autonomous'];
   for (const category of Object.keys(ROUTES)) {
     for (const difficulty of DIFFICULTIES) {
-      const { model } = decide(label({ category, difficulty }));
-      if (planning.includes(category)) assert.equal(model, 'fable', `${category}/${difficulty}`);
-      else if (difficulty === 'hard') assert.notEqual(model, 'fable', `${category}/${difficulty}`);
-      else assert.equal(model, 'sonnet', `${category}/${difficulty}`);
+      const { model, effort } = decide(label({ category, difficulty }));
+      const where = `${category}/${difficulty}`;
+      assert.ok(!['xhigh', 'max'].includes(effort), where);
+      if (coordinating.includes(category)) assert.equal(model, 'opus', where);
+      else if (category === 'deep_reasoning') assert.equal(model, 'fable', where);
+      else if (small.includes(category)) assert.equal(model, 'sonnet', where);
+      else if (deep.includes(category) && difficulty === 'hard') assert.deepEqual([model, effort], ['fable', 'high'], where);
+      else assert.notEqual(model, 'opus', where);
     }
   }
 });

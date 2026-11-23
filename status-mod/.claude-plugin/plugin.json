@@ -1,7 +1,7 @@
 {
   "name": "router-status",
-  "version": "0.5.0",
-  "description": "Shows the model router's choices, records each subagent's outcome and your rating for tuning, and runs the main session on Fable 5.2 while plan mode is on.",
+  "version": "0.6.0",
+  "description": "The model router: gives each subagent its model and effort (Sonnet for small jobs, Fable for deep work, Opus for planning and review), shows each choice, and records outcomes and your ratings for tuning.",
   "author": { "name": "octa89" },
   "license": "MIT",
   "types": "./types/index.d.ts"

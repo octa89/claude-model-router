@@ -17,7 +17,7 @@ import { execFileSync } from 'node:child_process';
 import { appendFile, readFile } from 'node:fs/promises';
 import { basename, dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { EFFORTS, FABLE_SUBAGENT_TYPES, MODELS, TYPE_ROUTES, route } from './router.mjs';
+import { COORDINATOR_SUBAGENT_TYPES, EFFORTS, FINISH_NOTE, MODELS, TYPE_ROUTES, route } from './router.mjs';
 
 const LOG = join(dirname(fileURLToPath(import.meta.url)), 'router.log');
 const SUBAGENT_TOOLS = ['Agent', 'Task'];
@@ -108,18 +108,18 @@ export async function handle(event, { logFile = LOG, ...routeOpts } = {}) {
     .filter(Boolean)
     .join('\n');
 
-  // Planning and review subagents always run on Fable 5.2.
-  const isPlanOrReview = FABLE_SUBAGENT_TYPES.test(input.subagent_type ?? '');
+  // Planning and review subagents are the coordinator's work: always Opus 5.5.
+  const isPlanOrReview = COORDINATOR_SUBAGENT_TYPES.test(input.subagent_type ?? '');
   const startedAt = Date.now();
   const fixed = Object.hasOwn(TYPE_ROUTES, input.subagent_type ?? '') ? TYPE_ROUTES[input.subagent_type].split(':') : null;
   const choice = fixed
     ? { model: fixed[0], effort: fixed[1], source: 'type', category: null, difficulty: null, confidence: null }
     : await route(brief, {
         timeoutMs: CLASSIFY_TIMEOUT_MS,
-        ...(isPlanOrReview ? { minModel: 'fable' } : {}),
+        ...(isPlanOrReview ? { minModel: 'opus' } : {}),
         ...routeOpts,
       });
-  const model = input.model || choice.model;
+  const model = input.model || (isPlanOrReview && choice.model === 'fable' ? 'opus' : choice.model);
   const pickedFamily = familyOf(input.model);
   // A model the session picked, without an effort: the higher of the router's
   // effort and that model's own starting effort, so a retry on Opus of a task
@@ -176,11 +176,15 @@ export async function handle(event, { logFile = LOG, ...routeOpts } = {}) {
         (choice.risk === 'high' ? ', high risk' : '')
       : 'safe default, Bison gave no clear answer';
 
+  // Fable below high effort stops early more often: tell it to finish.
+  const needsFinishNote = familyOf(model) === 'fable' && EFFORTS.indexOf(effort) < EFFORTS.indexOf('high');
+  const prompt = needsFinishNote && !input.prompt.includes(FINISH_NOTE) ? input.prompt + FINISH_NOTE : input.prompt;
+
   return {
     systemMessage: `Model router: ${model} at ${effort} effort (${why})`,
     hookSpecificOutput: {
       hookEventName: 'PreToolUse',
-      updatedInput: { ...input, model, effort },
+      updatedInput: { ...input, prompt, model, effort },
     },
   };
 }
