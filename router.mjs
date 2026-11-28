@@ -73,8 +73,11 @@ export const DIFFICULTIES = Object.keys(DIFFICULTY_CRITERIA);
 //     multistep work in a real repository as its biggest gain, at half
 //     Fable's price. Measured 2026-11-23: builds on Fable high cost $375 in
 //     one day, $135 of it output (thinking) alone.
+//   - Opus 5.5 also takes hard research (moved from Fable 2026-11-27):
+//     Sonnet high wrote complete, sourced research rated hard, and Fable's
+//     research was no better at twice Opus's price.
 //   - Fable 5.2 is kept for the deepest thinking: design and architecture,
-//     and hard research, at high. Normal deep reasoning runs at medium, with
+//     at high. Normal deep reasoning runs at medium, with
 //     a "finish the whole task" note added, since it stops early below high.
 //   - xhigh and max are never chosen here: the guides reserve them for a
 //     measured gain.
@@ -84,7 +87,7 @@ export const ROUTES = {
   search_read: ['sonnet:low', 'sonnet:low', 'sonnet:medium'],
   coding_routine: ['sonnet:medium', 'sonnet:medium', 'sonnet:high'],
   coding_hard: ['sonnet:high', 'opus:medium', 'opus:high'],
-  knowledge_research: ['sonnet:medium', 'sonnet:high', 'fable:high'],
+  knowledge_research: ['sonnet:medium', 'sonnet:high', 'opus:high'],
   long_autonomous: ['sonnet:medium', 'sonnet:high', 'opus:high'],
   deep_reasoning: ['fable:medium', 'fable:high', 'fable:high'],
   orchestration: ['opus:medium', 'opus:medium', 'opus:high'],
@@ -125,7 +128,9 @@ const HAIKU_ROUTES = {
 // once on Opus (the coordinator's rule), cheaper overall than starting there.
 export const FALLBACK = { model: 'sonnet', effort: 'high' };
 // Below this probability for the chosen category, the safe default is used.
-export const MIN_CONFIDENCE = 0.5;
+// Lowered from 0.5 on 2026-11-27: 45% of live decisions fell under 0.5, and
+// in the level 1 test a 0.4 cut kept 88% accuracy with 2% falling back.
+export const MIN_CONFIDENCE = 0.4;
 // At or above this probability of "high risk", the Opus floor applies.
 // Set low on purpose: a wrong "risky" only costs a stronger model.
 export const RISK_THRESHOLD = 0.4;

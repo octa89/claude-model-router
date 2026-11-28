@@ -17,7 +17,7 @@ Fixed rules then turn those answers into a model and an effort level. The rules 
 
 ## Policy
 
-**Opus 5.5 coordinates (main session, planning, reviews) and takes hard builds; Sonnet 5.5 does the small and everyday jobs; Fable 5.2 only does the deepest thinking (design, hard research).** Hard builds moved from Fable to Opus on 2026-11-23: Fable builds cost $375 in one day, and Opus is half the price and its guide names multistep work in a real repository as its biggest gain. Effort levels follow each model's guide: Sonnet low for chat and search and medium for coding; Opus medium (its default, which beats Opus 5 at high); Fable high for hard work.
+**Opus 5.5 coordinates (main session, planning, reviews) and takes hard builds; Sonnet 5.5 does the small and everyday jobs; Fable 5.2 only does the deepest thinking (design and architecture).** Hard builds moved from Fable to Opus on 2026-11-23: Fable builds cost $375 in one day, and Opus is half the price and its guide names multistep work in a real repository as its biggest gain. Hard research moved to Opus on 2026-11-27: Sonnet high wrote complete, sourced research rated hard, and Fable's was no better. Effort levels follow each model's guide: Sonnet low for chat and search and medium for coding; Opus medium (its default, which beats Opus 5 at high); Fable high for hard work.
 
 | Task | Easy | Normal | Hard |
 |---|---|---|---|
@@ -26,7 +26,7 @@ Fixed rules then turn those answers into a model and an effort level. The rules 
 | Search and read | Sonnet low | Sonnet low | Sonnet medium |
 | Routine coding | Sonnet medium | Sonnet medium | Sonnet high |
 | Hard coding | Sonnet high | Opus medium | Opus high |
-| Research and analysis | Sonnet medium | Sonnet high | Fable high |
+| Research and analysis | Sonnet medium | Sonnet high | Opus high |
 | Long unattended work | Sonnet medium | Sonnet high | Opus high |
 | Deep reasoning, design | Fable medium | Fable high | Fable high |
 | Orchestrating other agents | Opus medium | Opus medium | Opus high |
@@ -36,7 +36,7 @@ A Fable brief below high effort gets a short "finish the whole task" section add
 
 Safety nets:
 
-- **Unsure or unavailable classifier.** If Bison fails, no key is set, or the chosen category has a probability under 0.5, the subagent gets Sonnet at high; if it fails, it is retried once on Opus. Subagents are never blocked.
+- **Unsure or unavailable classifier.** If Bison fails, no key is set, or the chosen category has a probability under 0.4, the subagent gets Sonnet at high; if it fails, it is retried once on Opus. Subagents are never blocked.
 - **Risky work.** A risk probability of 0.4 or more means at least Opus at medium.
 - **Fixed routes by type.** `Explore`, `web-fetch`, `claude-code-guide`, `statusline-setup`, `caveman:cavecrew-investigator` and `codex:codex-rescue` always get Sonnet at low, without asking the classifier: they only read, or relay Codex's work.
 - **Fixed subagent types.** Subagents of type `Plan`, and any type with "review", "verif" or "audit" in its name, always get Opus, the coordinator.

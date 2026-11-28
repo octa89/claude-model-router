@@ -111,6 +111,11 @@ test('low probability or a missing label falls back to the safe default', () => 
   }
 });
 
+test('the unsure cutoff is 0.4: 0.45 is used, 0.39 falls back', () => {
+  assert.equal(decide(label({ category: 'search_read', confidence: 0.45 })).source, 'classifier');
+  assert.equal(decide(label({ category: 'search_read', confidence: 0.39 })).source, 'fallback');
+});
+
 test('a label with no probability is still used, and says so', () => {
   const r = decide(label({ confidence: null }));
   assert.deepEqual(pick(r), ['sonnet', 'medium']);
@@ -295,7 +300,7 @@ test('names every object inherits are not mistaken for models or categories', ()
   assert.throws(() => readDecision(decision({ category: 'constructor' })), /unknown category/);
 });
 
-test('policy: Sonnet small jobs, Opus coordination and hard builds, Fable only the deepest thinking', () => {
+test('policy: Sonnet small jobs, Opus coordination, hard builds and hard research, Fable only the deepest thinking', () => {
   const coordinating = ['orchestration', 'review_verify'];
   const small = ['classify_extract', 'chat_simple', 'search_read', 'coding_routine'];
   const deep = ['knowledge_research'];
@@ -308,7 +313,7 @@ test('policy: Sonnet small jobs, Opus coordination and hard builds, Fable only t
       if (coordinating.includes(category)) assert.equal(model, 'opus', where);
       else if (category === 'deep_reasoning') assert.equal(model, 'fable', where);
       else if (small.includes(category)) assert.equal(model, 'sonnet', where);
-      else if (deep.includes(category) && difficulty === 'hard') assert.deepEqual([model, effort], ['fable', 'high'], where);
+      else if (deep.includes(category) && difficulty === 'hard') assert.deepEqual([model, effort], ['opus', 'high'], where);
       else if (builds.includes(category)) assert.notEqual(model, 'fable', where);
       else assert.equal(model, 'sonnet', where);
     }
